@@ -227,10 +227,12 @@ def import_project(doc: dict, folder: str = "") -> dict:
     spec = json.loads(json.dumps(doc["spec"]))     # 深拷贝，不动上传的原文
     spec["id"] = new_id
     spec.setdefault("data", {})["dataset"] = ds
+    # 项目文件可能来自别人的电脑：里面的旧路径一律作废，重新指向刚恢复的数据集。
+    spec["data"]["working_csv"] = paths.portable(paths.working(ds))
     if not (spec.get("export") or {}).get("base"):
         spec.setdefault("export", {})["base"] = sanitize_base(
             doc.get("title") or new_id)
-    spec["export"]["dir"] = paths.out_dir(new_id)
+    spec["export"]["dir"] = paths.portable(paths.out_dir(new_id))
     # 打开的项目沿用保存时的图名：resolve_name 只在缺 name_date 时按数据日期补一次，
     # 有了就冻住，所以同一份项目隔几天打开也不会变成另一个名字/另一个文件夹。
     if spec["export"].get("auto_name"):

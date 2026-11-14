@@ -11,7 +11,7 @@
     "note"
   ],
   "dedup_rule": "按文件名主干分组；组内文本导出优先，二进制记 skipped_duplicate；禁止用频率取整去重（浮点差 3.9e-04 量级）",
-  "source_of_sources": "C:\\Users\\dexia\\Desktop\\光热空白对照",
+  "source_of_sources": "~/Desktop/光热空白对照",
   "sources": [
     {
       "file": "PBS.csv",

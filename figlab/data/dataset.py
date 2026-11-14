@@ -141,7 +141,7 @@ class Dataset:
             "ingested_at": now(), "columns": columns(self.spectrum),
             "dedup_rule": "按文件名主干分组；组内文本导出优先，二进制记 skipped_duplicate；"
                           "禁止用频率取整去重（浮点差 3.9e-04 量级）",
-            "source_of_sources": os.path.abspath(src),
+            "source_of_sources": paths.display_source(src),
             "sources": sources,
             "totals": {
                 "source_files": len(files),

@@ -28,6 +28,7 @@ LAYER_KEYS = ("left", "top", "width", "height")
 
 def available_curves(spec: dict) -> set[str]:
     p = spec.get("data", {}).get("working_csv", "")
+    p = paths.absolute(p) if str(p or "").strip() else ""
     if not p or not os.path.isfile(p):
         return set()
     with open(p, "r", encoding="utf-8-sig", newline="") as fh:
@@ -69,8 +70,10 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     for k in ("working_csv", "x", "y", "only_included"):
         ck(k in data, "data 缺少字段：%s" % k)
     wcsv = str(data.get("working_csv", ""))
-    ck(os.path.isabs(wcsv), "data.working_csv 必须是绝对路径（缺陷清单第 2 条）")
-    ck(os.path.isfile(wcsv), "data.working_csv 不存在：%s" % wcsv)
+    ck(bool(wcsv.strip()), "data.working_csv 不能为空")
+    # 相对路径按项目根解析（规格里默认存相对写法，换机器/换目录也能用）
+    ck(os.path.isfile(paths.absolute(wcsv)) if wcsv.strip() else False,
+       "data.working_csv 不存在（相对路径按项目根解析）：%s" % wcsv)
     ck(isinstance(data.get("only_included"), bool), "data.only_included 必须是布尔")
     tail = data.get("tail_ohm", 0)
     ck(_num(tail) is not None and float(tail or 0) >= 0,
@@ -213,10 +216,10 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
                 ck(bool(HEX.match(str(t.get("color")))),
                    "texts[%d].color 必须是 #RRGGBB" % i)
 
-    # ---- 导出（绝对路径 + 600 dpi 位图仅预览）
+    # ---- 导出（规格里存相对项目根的写法；渲染/校验前统一解析为绝对路径）
     ex = spec.get("export", {}) or {}
     d = str(ex.get("dir", ""))
-    ck(os.path.isabs(d), "export.dir 必须是绝对路径（缺陷清单第 2 条）")
+    ck(bool(d.strip()), "export.dir 不能为空")
     ck(bool(str(ex.get("base", "")).strip()), "export.base 不能为空")
     ck(not re.search(r'[\\/:*?"<>|]', str(ex.get("base", ""))),
        "export.base 不能含 Windows 文件名字符：%r" % ex.get("base"))

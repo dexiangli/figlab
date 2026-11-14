@@ -30,6 +30,18 @@ def _strip_svg(s: str) -> str:
     return s.strip()
 
 
+def _userpath(p) -> str:
+    """页面上手填的路径：去空白，并把 ~ 与环境变量展开成真实路径。
+
+    用户可能写 ``~/Desktop/组会.pptx``（mac/Linux 习惯）或 ``%USERPROFILE%\\Desktop``，
+    直接丢给 open() 会找不到；这里统一展开一次，空值仍返回空串。
+    """
+    s = str(p or "").strip().strip('"').strip("'")
+    if not s:
+        return ""
+    return os.path.normpath(os.path.expandvars(os.path.expanduser(s)))
+
+
 def _payload(built: dict, spec: dict) -> dict:
     """把一次渲染的结果打包给页面：SVG + 热区点 + 标注 + 文字 + 规格。
 
@@ -224,7 +236,7 @@ def export_pptx(fig_id: str, body: dict) -> dict:
         return path.replace("/", "\\").lower().startswith(root)
 
     if str(body.get("mode") or "new").lower() == "append":
-        target = str(body.get("path") or "").strip()
+        target = _userpath(body.get("path"))
         res = pptx_out.append(spec, png, url, target, caption, subtitle)
         if not res.get("ok"):
             return res
@@ -239,7 +251,7 @@ def export_pptx(fig_id: str, body: dict) -> dict:
         return res
 
     # 默认就放桌面图名文件夹里，和 PDF 并排；用户显式给 path 时以用户为准
-    out = str(body.get("path") or "").strip() or \
+    out = _userpath(body.get("path")) or \
         os.path.join(handoff.figure_dir(base, spec), base + ".pptx")
     res = pptx_out.build(spec, png, url, out, caption, subtitle)
     res["png"] = png

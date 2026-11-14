@@ -18,10 +18,57 @@ FIGURES = os.path.join(ROOT, "figures.json")
 
 
 def absolute(p: str) -> str:
-    """把任意契约路径解析为绝对路径；空路径直接报错，不静默兜底。"""
+    """把任意契约路径解析为绝对路径；空路径直接报错，不静默兜底。
+
+    **相对路径一律按项目根（ROOT）解析**，所以规格里可以放心存
+    ``datasets/eis_20261107/working.csv`` 这种相对写法：项目整个搬到别的盘、
+    别人的电脑上克隆下来，都还能找到。
+    """
     if not p:
         raise ValueError("路径为空：所有层间契约必须显式给出路径")
     return os.path.normpath(p if os.path.isabs(p) else os.path.join(ROOT, p))
+
+
+def portable(p: str) -> str:
+    """写进规格文件前的路径规范：项目内的存相对，项目外的保持绝对。
+
+    - 项目内（工作副本、中间导出目录）→ ``datasets/..../working.csv`` 这种相对路径，
+      换台机器 clone、整个项目搬到别的盘也不会指错；
+    - 项目外（桌面的成品文件夹、用户自己指定的 ppt 路径）→ 保留绝对路径，
+      它们本来就不在项目里，相对化没有意义。
+    """
+    if not p:
+        return p
+    ap = os.path.normpath(p if os.path.isabs(p) else os.path.join(ROOT, p))
+    try:
+        rel = os.path.relpath(ap, ROOT)
+    except ValueError:                      # Windows 跨盘符
+        return ap
+    if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+        return ap
+    return rel.replace(os.sep, "/")
+
+
+def display_source(p: str) -> str:
+    """把「这份数据是从哪来的」写成能公开的短路径。
+
+    元数据要跟着仓库给人看，不能写 ``C:\\Users\\<某人>\\Desktop\\...``：
+    家目录下的写成 ``~/Desktop/...``，项目内的写成相对路径，其它保持原样。
+    """
+    if not p:
+        return p
+    ap = os.path.normpath(p if os.path.isabs(p) else os.path.join(ROOT, p))
+    rel = portable(ap)
+    if rel != ap or not os.path.isabs(ap):
+        return rel
+    home = os.path.expanduser("~")
+    try:
+        h = os.path.relpath(ap, home)
+    except ValueError:
+        return ap
+    if h.startswith(os.pardir):
+        return ap
+    return "~/" + h.replace(os.sep, "/")
 
 
 def dataset_dir(name: str) -> str:

@@ -83,8 +83,9 @@ def ensure(fig_id: str, preset: str = "inhouse", title: str = "",
     """注册/更新一张图；已有条目的 folder、title 不被覆盖（重绘不该挪位置）。"""
     data = load()
     fig = _figure(data, fig_id)
-    # 规格文件路径存「相对项目根」，这样整个目录搬到别的机器 / 别人克隆后依然有效
-    rel_spec = os.path.join("specs", fig_id + ".json")
+    # 规格文件路径存「相对项目根」，这样整个目录搬到别的机器 / 别人克隆后依然有效；
+    # 分隔符固定用正斜杠，仓库在 Windows / macOS / Linux 上看起来是同一个写法
+    rel_spec = "specs/%s.json" % fig_id
     if fig is None:
         fig = {"id": fig_id, "preset": preset, "spec": rel_spec,
                "folder": folder or data["folders"][0]["id"],

@@ -175,7 +175,7 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
         "note": note,
         "data": {
             "dataset": dataset,
-            "working_csv": paths.working(dataset),   # 绝对路径
+            "working_csv": paths.portable(paths.working(dataset)),   # 相对项目根
             "x": "Zp_ohm", "y": "Zpp_neg_ohm",
             "only_included": True,
             "tail_ohm": tail_ohm,
@@ -191,7 +191,7 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
         "legend": copy.deepcopy(p["legend"]),
         "texts": [],                      # 自由文字对象，可拖可改
         "export": {
-            "dir": outdir,              # 绝对路径
+            "dir": paths.portable(outdir),   # 相对项目根，换机器也能用
             "base": default_base(dataset, spectrum, suffix),
             "name_suffix": suffix,
             "name_date": data_date(dataset),   # 数据日期，定名后不再改
@@ -209,7 +209,17 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
 
 def save_spec(spec: dict, register: bool = True) -> str:
     """写规格文件。register=False 时只落文件、不往项目树里塞新窗口
-    （出 PPT / 自动导出这类动作不该改变项目结构）。"""
+    （出 PPT / 自动导出这类动作不该改变项目结构）。
+
+    落盘前把项目内的路径改成相对写法：规格文件是要跟着项目一起搬家的，
+    写死本机盘符的绝对路径，换台机器就全指错了。
+    """
+    data = spec.get("data")
+    if isinstance(data, dict) and str(data.get("working_csv") or "").strip():
+        data["working_csv"] = paths.portable(data["working_csv"])
+    ex = spec.get("export")
+    if isinstance(ex, dict) and str(ex.get("dir") or "").strip():
+        ex["dir"] = paths.portable(ex["dir"])
     paths.ensure_dirs(paths.SPECS)
     p = paths.spec_file(spec["id"])
     with open(p, "w", encoding="utf-8") as fh:

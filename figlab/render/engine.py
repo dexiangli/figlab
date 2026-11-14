@@ -17,6 +17,7 @@ import math
 from collections import defaultdict
 
 from .curve import CONNECT_MODES, smooth_path
+from .. import paths
 
 import matplotlib
 matplotlib.use("Agg")
@@ -234,7 +235,7 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     fonts = setup_rc(st)          # 含 CJK 回退的字体族列表
     font = st["font"]
 
-    rows = read_long(data["working_csv"], spectrum)
+    rows = read_long(paths.absolute(data["working_csv"]), spectrum)
     only_inc = data.get("only_included", True)
     groups = defaultdict(list)        # 曲线 → [(行, 是否参与)]，保持文件原序
     for r in rows:

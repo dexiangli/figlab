@@ -10,10 +10,11 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { findBrowser } from "./_browser.mjs";
 
 const PORT = Number(process.argv[2] || 8778);
 const FIG = process.argv[3] || "eis_wide";
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const EDGE = findBrowser();
 const CDP = 9335;
 const profile = mkdtempSync(join(tmpdir(), "figlab-pick-"));
 

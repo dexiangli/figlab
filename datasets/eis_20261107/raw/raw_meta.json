@@ -12,7 +12,7 @@
     "note"
   ],
   "dedup_rule": "按文件名主干分组；组内文本导出优先，二进制记 skipped_duplicate；禁止用频率取整去重（浮点差 3.9e-04 量级）",
-  "source_of_sources": "C:\\Users\\dexia\\Desktop\\20261107阻抗.zip",
+  "source_of_sources": "~/Desktop/20261107阻抗.zip",
   "sources": [
     {
       "file": "Bi2S3+HP-MnO2@PtAu 1-1.csv",

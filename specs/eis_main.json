@@ -5,7 +5,7 @@
  "note": "全部 8 条文本曲线进图，不替使用者做实验取舍；固定欧姆数截尾",
  "data": {
   "dataset": "eis_20261107",
-  "working_csv": "D:\\WorkBuddyPlace\\figlab\\datasets\\eis_20261107\\working.csv",
+  "working_csv": "datasets/eis_20261107/working.csv",
   "x": "Zp_ohm",
   "y": "Zpp_neg_ohm",
   "only_included": true,
@@ -171,7 +171,7 @@
  },
  "texts": [],
  "export": {
-  "dir": "D:\\WorkBuddyPlace\\figlab\\outputs\\eis_main",
+  "dir": "outputs/eis_main",
   "base": "20261107阻抗作图",
   "name_suffix": "",
   "name_date": "20261107",
