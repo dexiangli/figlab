@@ -161,6 +161,18 @@ def series_for(curves: list[str], preset: dict) -> list[dict]:
     return out
 
 
+# 每种谱型默认拿哪两列画、轴标题写什么。阻抗以外的新谱型必须先在这里登记，
+# 否则会拿 Zp/Zpp 去画，图上出现一条不合逻辑的曲线。
+DATA_AXES = {
+    "eis": ("Zp_ohm", "Zpp_neg_ohm"),
+    "photothermal": ("time_s", "temp_C"),
+}
+AXIS_TITLES = {
+    "eis": ("Z' (Ω)", "-Z'' (Ω)"),
+    "photothermal": ("Time (s)", "Temperature (°C)"),
+}
+
+
 def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inhouse",
                overrides: dict | None = None, note: str = "",
                tail_ohm: float = 60.0, fit_arc: bool = False,
@@ -168,6 +180,13 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
     p = load_preset(preset)
     outdir = paths.out_dir(fig_id)
     suffix = next_suffix(dataset, spectrum)
+    xcol, ycol = DATA_AXES.get(spectrum, DATA_AXES["eis"])
+    ax = copy.deepcopy(p["axis"])
+    # 模板里的轴标题还是阻抗的那套（说明用户没自定义过）→ 按谱型换成对的；
+    # 用户已经在 preset 里改成自己的标题时保持不动。
+    if spectrum in AXIS_TITLES and \
+            (ax.get("x_title"), ax.get("y_title")) == AXIS_TITLES["eis"]:
+        ax["x_title"], ax["y_title"] = AXIS_TITLES[spectrum]
     spec = {
         "id": fig_id,
         "preset": preset,
@@ -175,8 +194,9 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
         "note": note,
         "data": {
             "dataset": dataset,
+            "spectrum": spectrum,        # 渲染层据此选处理器；漏了会把光热当阻抗画
             "working_csv": paths.portable(paths.working(dataset)),   # 相对项目根
-            "x": "Zp_ohm", "y": "Zpp_neg_ohm",
+            "x": xcol, "y": ycol,
             "only_included": True,
             "tail_ohm": tail_ohm,
             "fit_arc": fit_arc,
@@ -186,7 +206,7 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
         "page": copy.deepcopy(p["page"]),
         "layer": copy.deepcopy(p["layer"]),
         "style": copy.deepcopy(p["style"]),
-        "axis": copy.deepcopy(p["axis"]),
+        "axis": ax,
         "series": series_for(curves, p),
         "legend": copy.deepcopy(p["legend"]),
         "texts": [],                      # 自由文字对象，可拖可改
