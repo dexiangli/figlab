@@ -1,0 +1,133 @@
+{
+  "dataset": "photothermal_20261111",
+  "spectrum": "photothermal",
+  "ingested_at": "2026-11-14T10:52:46",
+  "columns": [
+    "curve",
+    "point_index",
+    "time_s",
+    "temp_C",
+    "include",
+    "note"
+  ],
+  "dedup_rule": "按文件名主干分组；组内文本导出优先，二进制记 skipped_duplicate；禁止用频率取整去重（浮点差 3.9e-04 量级）",
+  "source_of_sources": "C:\\Users\\dexia\\Desktop\\光热空白对照",
+  "sources": [
+    {
+      "file": "PBS.csv",
+      "kind": "TEXT",
+      "sha256": "70f945d0ec6f6dbf99b276f15304d68512ae11c8b8a5749a76932b6b3df1395f",
+      "points": 3851,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.062,
+      "last": 242.348
+    },
+    {
+      "file": "PBS-1.csv",
+      "kind": "TEXT",
+      "sha256": "f03ab3ce15b790482385a5d949b7c28044c800064aae1cb225342cfaa3671af6",
+      "points": 1158,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.203,
+      "last": 234.051
+    },
+    {
+      "file": "PBS-2.csv",
+      "kind": "TEXT",
+      "sha256": "70cddaf1033c4ffd2a50d8b3fa8aad2f4c049b3f650efde370b1ffc523dea540",
+      "points": 2305,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.157,
+      "last": 158.52
+    },
+    {
+      "file": "PBS-3.csv",
+      "kind": "TEXT",
+      "sha256": "af239c1c515af901da2b4956305a304903cab409023097b0285179d1263b2ca4",
+      "points": 2393,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.063,
+      "last": 163.924
+    },
+    {
+      "file": "PBS-4.csv",
+      "kind": "TEXT",
+      "sha256": "3a2b599b9f9914850fe6b647c8b3a40960a9f1867595a2614ed8be9f4959c902",
+      "points": 2085,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.063,
+      "last": 141.716
+    },
+    {
+      "file": "PBS-5.csv",
+      "kind": "TEXT",
+      "sha256": "9b2d7b22c017b091aeebbca11dc5596de439a5413619cfc14413712394e455a2",
+      "points": 2395,
+      "stamp": "",
+      "params": {
+        "header": [
+          "时间",
+          "Ar1.平均值 (℃)"
+        ]
+      },
+      "encoding": "gb18030",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": 0.063,
+      "last": 164.947
+    }
+  ],
+  "totals": {
+    "source_files": 6,
+    "text_chosen": 6,
+    "skipped_duplicates": 0,
+    "bin_only_not_ingested": 0,
+    "curves": 6,
+    "points": 14187
+  }
+}

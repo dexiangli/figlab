@@ -1,0 +1,69 @@
+{
+  "name": "inhouse",
+  "label": "组内期刊模板（默认）",
+  "page": {
+    "w_cm": 8.0,
+    "h_cm": 6.0
+  },
+  "layer": {
+    "left": 20.0,
+    "top": 10.0,
+    "width": 70.0,
+    "height": 70.0
+  },
+  "style": {
+    "font": "Times New Roman",
+    "tick_pt": 9.0,
+    "title_pt": 11.0,
+    "spines": "all",
+    "tick_dir": "in",
+    "grid": false,
+    "equal_aspect": false,
+    "fill_frame": true,
+    "line_width_pt": 0.6,
+    "marker_size_pt": 2.6,
+    "frame_line_width_pt": 0.6,
+    "break_gaps": true,
+    "connect": "segment"
+  },
+  "axis": {
+    "x_title": "Z' (Ω)",
+    "y_title": "-Z'' (Ω)",
+    "x_from": null,
+    "x_to": null,
+    "x_inc": null,
+    "y_from": null,
+    "y_to": null,
+    "y_inc": null,
+    "auto_from_data": true,
+    "pad_frac": 0.05,
+    "snap_to_tick": true,
+    "zero_origin": false
+  },
+  "palette": [
+    "#1F4E79",
+    "#C00000",
+    "#2E7D32",
+    "#6A1B9A",
+    "#E65100",
+    "#00695C",
+    "#8E24AA",
+    "#B71C1C"
+  ],
+  "marker_cycle": [
+    "circle",
+    "square",
+    "triangle_up",
+    "triangle_down"
+  ],
+  "legend": {
+    "show": false
+  },
+  "export": {
+    "dpi": 600,
+    "formats": [
+      "pdf"
+    ]
+  },
+  "note": "画布 8×6 cm；图层 20/10/70/70% = 页边距左 1.6、上 0.6、右 0.8、下 1.2 cm，图框 5.6×4.2 cm；等比关闭，默认铺满。"
+}

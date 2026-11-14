@@ -1,0 +1,71 @@
+{
+  "name": "dark_outline",
+  "label": "深色描边（PPT / 深色背景）",
+  "page": {
+    "w_cm": 8.0,
+    "h_cm": 6.0
+  },
+  "layer": {
+    "left": 20.0,
+    "top": 10.0,
+    "width": 70.0,
+    "height": 70.0
+  },
+  "style": {
+    "font": "Arial",
+    "tick_pt": 10.0,
+    "title_pt": 12.0,
+    "spines": "all",
+    "tick_dir": "in",
+    "grid": false,
+    "equal_aspect": false,
+    "fill_frame": true,
+    "line_width_pt": 1.0,
+    "marker_size_pt": 3.2,
+    "frame_line_width_pt": 1.0,
+    "ink": "#14213D",
+    "background": "transparent",
+    "break_gaps": true,
+    "connect": "segment"
+  },
+  "axis": {
+    "x_title": "Z' (Ω)",
+    "y_title": "-Z'' (Ω)",
+    "x_from": null,
+    "x_to": null,
+    "x_inc": null,
+    "y_from": null,
+    "y_to": null,
+    "y_inc": null,
+    "auto_from_data": true,
+    "pad_frac": 0.05,
+    "snap_to_tick": true,
+    "zero_origin": false
+  },
+  "palette": [
+    "#0B3C5D",
+    "#8B1E1E",
+    "#1B5E20",
+    "#4A148C",
+    "#9A4B00",
+    "#004D40",
+    "#6A1B9A",
+    "#B71C1C"
+  ],
+  "marker_cycle": [
+    "circle",
+    "square",
+    "triangle_up",
+    "triangle_down"
+  ],
+  "legend": {
+    "show": false
+  },
+  "export": {
+    "dpi": 600,
+    "formats": [
+      "pdf"
+    ]
+  },
+  "note": "深色高对比描边，适合 PPT 与深色版式；线宽与符号略放大，仍为矢量真文字。"
+}

@@ -1,0 +1,69 @@
+{
+  "name": "generic",
+  "label": "通用期刊风格",
+  "page": {
+    "w_cm": 8.5,
+    "h_cm": 6.5
+  },
+  "layer": {
+    "left": 18.0,
+    "top": 12.0,
+    "width": 72.0,
+    "height": 72.0
+  },
+  "style": {
+    "font": "Arial",
+    "tick_pt": 9.0,
+    "title_pt": 11.0,
+    "spines": "all",
+    "tick_dir": "in",
+    "grid": false,
+    "equal_aspect": false,
+    "fill_frame": true,
+    "line_width_pt": 0.7,
+    "marker_size_pt": 2.8,
+    "frame_line_width_pt": 0.7,
+    "break_gaps": true,
+    "connect": "segment"
+  },
+  "axis": {
+    "x_title": "Z' (Ω)",
+    "y_title": "-Z'' (Ω)",
+    "x_from": null,
+    "x_to": null,
+    "x_inc": null,
+    "y_from": null,
+    "y_to": null,
+    "y_inc": null,
+    "auto_from_data": true,
+    "pad_frac": 0.06,
+    "snap_to_tick": true,
+    "zero_origin": false
+  },
+  "palette": [
+    "#2C5F8D",
+    "#B23A3A",
+    "#2E8B57",
+    "#7B4FA8",
+    "#D2761B",
+    "#138A8A",
+    "#9C27B0",
+    "#C2185B"
+  ],
+  "marker_cycle": [
+    "circle",
+    "square",
+    "triangle_up",
+    "triangle_down"
+  ],
+  "legend": {
+    "show": false
+  },
+  "export": {
+    "dpi": 600,
+    "formats": [
+      "pdf"
+    ]
+  },
+  "note": "通用单栏：Arial、8.5×6.5 cm、18/12/72/72%；仍为封闭实心符号、无图例、铺满图框。"
+}

@@ -1,0 +1,163 @@
+{
+  "id": "eis_wide",
+  "preset": "inhouse",
+  "overrides": {
+    "page": {
+      "w_cm": 10.0
+    },
+    "style": {
+      "tick_pt": 10.0
+    }
+  },
+  "note": "演示单图覆盖：10 cm 宽、刻度 10 pt",
+  "data": {
+    "dataset": "eis_20261107",
+    "working_csv": "D:\\WorkBuddyPlace\\figlab\\datasets\\eis_20261107\\working.csv",
+    "x": "Zp_ohm",
+    "y": "Zpp_neg_ohm",
+    "only_included": true,
+    "tail_ohm": 60.0,
+    "fit_arc": false,
+    "fit_disclaimer": ""
+  },
+  "page": {
+    "w_cm": 10.0,
+    "h_cm": 6.0
+  },
+  "layer": {
+    "left": 20.0,
+    "top": 10.0,
+    "width": 70.0,
+    "height": 70.0
+  },
+  "style": {
+    "font": "Times New Roman",
+    "tick_pt": 10.0,
+    "title_pt": 11.0,
+    "spines": "all",
+    "tick_dir": "in",
+    "grid": false,
+    "equal_aspect": false,
+    "fill_frame": true,
+    "line_width_pt": 0.6,
+    "marker_size_pt": 2.6,
+    "frame_line_width_pt": 0.6,
+    "break_gaps": true,
+    "connect": "segment"
+  },
+  "axis": {
+    "x_title": "Z' (Ω)",
+    "y_title": "-Z'' (Ω)",
+    "x_from": null,
+    "x_to": null,
+    "x_inc": null,
+    "y_from": null,
+    "y_to": null,
+    "y_inc": null,
+    "auto_from_data": true,
+    "pad_frac": 0.05,
+    "snap_to_tick": true,
+    "zero_origin": false
+  },
+  "series": [
+    {
+      "curve": "Bi2S3+HP-MnO2@PtAu 1-1",
+      "letter": "a",
+      "name": "",
+      "annot_text": "a",
+      "color": "#1F4E79",
+      "marker": "circle",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    },
+    {
+      "curve": "Bi2S3+HP-MnO2@PtAu 1-2",
+      "letter": "b",
+      "name": "",
+      "annot_text": "b",
+      "color": "#C00000",
+      "marker": "square",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    },
+    {
+      "curve": "Bi2S3+HP-MnO2@PtAu+4-CD 1-1",
+      "letter": "c",
+      "name": "",
+      "annot_text": "c",
+      "color": "#2E7D32",
+      "marker": "triangle_up",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    },
+    {
+      "curve": "Bi2S3+HP-MnO2@PtAu+4-CD 2-1",
+      "letter": "d",
+      "name": "",
+      "annot_text": "d",
+      "color": "#6A1B9A",
+      "marker": "triangle_down",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    },
+    {
+      "curve": "Bi2S3+MnO2@PtAu 1-1",
+      "letter": "e",
+      "name": "",
+      "annot_text": "e",
+      "color": "#E65100",
+      "marker": "circle",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    },
+    {
+      "curve": "Bi2S3+MnO2@PtAu+4-CD 1-1",
+      "letter": "f",
+      "name": "",
+      "annot_text": "f",
+      "color": "#00695C",
+      "marker": "square",
+      "include": true,
+      "annot_dx_pt": 7.0,
+      "annot_dy_pt": 0.0,
+      "annot_locked": false,
+      "off_x": 0.0,
+      "off_y": 0.0
+    }
+  ],
+  "legend": {
+    "show": false
+  },
+  "texts": [],
+  "export": {
+    "dir": "D:\\WorkBuddyPlace\\figlab\\outputs\\eis_wide",
+    "base": "20261107阻抗作图3",
+    "name_suffix": "3",
+    "name_date": "20261107",
+    "auto_name": true,
+    "dpi": 600,
+    "formats": [
+      "pdf"
+    ]
+  }
+}

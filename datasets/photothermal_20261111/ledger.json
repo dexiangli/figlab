@@ -1,0 +1,11 @@
+[
+  {
+    "at": "2026-11-14T10:52:46",
+    "action": "ingest",
+    "reason": "验证 GBK 表头与畸形时间列容忍",
+    "curves": 6,
+    "points": 14187,
+    "skipped_duplicates": [],
+    "bin_only_not_ingested": []
+  }
+]

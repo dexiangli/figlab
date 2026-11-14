@@ -1,0 +1,72 @@
+[
+  {
+    "at": "2026-11-14T10:52:46",
+    "action": "ingest",
+    "reason": "按新平台从零摄取，原始快照写入后只读",
+    "curves": 8,
+    "points": 593,
+    "skipped_duplicates": [
+      "Bi2S3+HP-MnO2@PtAu 1-1.bin",
+      "Bi2S3+HP-MnO2@PtAu 1-2.bin",
+      "Bi2S3+HP-MnO2@PtAu+4-CD 1-1.bin",
+      "Bi2S3+HP-MnO2@PtAu+4-CD 2-1.bin",
+      "Bi2S3+MnO2@PtAu 1-1.bin",
+      "Bi2S3+MnO2@PtAu+4-CD 1-1.bin",
+      "ITO 1-1.bin",
+      "ITO 2-2.bin"
+    ],
+    "bin_only_not_ingested": [
+      "Bi2S3 1-1.bin",
+      "Bi2S3 1-2.bin",
+      "Bi2S3+HP-MnO2@PtAu+4-CD 2-2.bin",
+      "Bi2S3+MnO2@PtAu 1-2.bin",
+      "Bi2S3+MnO2@PtAu+4-CD 1-2.bin",
+      "ITO 1-2.bin",
+      "ITO 2-1.bin"
+    ]
+  },
+  {
+    "at": "2026-11-14T10:52:46",
+    "action": "modify",
+    "reason": "高频首点读数复核",
+    "curve": "ITO 1-1",
+    "point_index": 1,
+    "field": "Zp_ohm",
+    "old": "13.37",
+    "new": "13.4"
+  },
+  {
+    "at": "2026-11-14T10:52:46",
+    "action": "exclude",
+    "reason": "接插件瞬态干扰，非稳态数据",
+    "subtype": "exclude",
+    "curve": "ITO 1-1",
+    "point_index": 2,
+    "old": "1",
+    "new": "0"
+  },
+  {
+    "at": "2026-11-14T10:52:46",
+    "action": "modify",
+    "reason": "复核后恢复参与",
+    "subtype": "restore",
+    "curve": "ITO 1-1",
+    "point_index": 2,
+    "old": "0",
+    "new": "1"
+  },
+  {
+    "at": "2026-11-14T10:52:48",
+    "action": "export",
+    "reason": "导出投稿级图件并自检，状态=合格",
+    "figure": "eis_main",
+    "formats": [
+      "pdf",
+      "png"
+    ],
+    "files": [
+      "outputs/eis_main/20261107阻抗作图3.pdf",
+      "outputs/eis_main/20261107阻抗作图3.png"
+    ]
+  }
+]

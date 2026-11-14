@@ -1,0 +1,14 @@
+# 运行产物（每个部署环境自己生成，不入库）
+outputs/
+tmp*
+*.pyc
+__pycache__/
+.DS_Store
+Thumbs.db
+
+# 本机测试原始件（数据层测试件放自己桌面即可，不入库）
+tmp_layer4_eis_main.json
+
+# 编辑器
+.vscode/
+.idea/

@@ -1,0 +1,6 @@
+# figlab 运行时依赖（Python 3.10+，建议 3.12）
+# 安装：pip install -r requirements.txt
+matplotlib>=3.8
+numpy>=1.26
+python-pptx>=1.0
+pillow>=10.0

@@ -1,0 +1,2702 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>figlab · 本地科研绘图台</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{--bg:#fbfbfa;--panel:#fff;--line:#e4e2dd;--ink:#26262a;--muted:#86847f;
+        --accent:#2f6dae;--warn:#a64b42;--ok:#2e7d55;--soft:#f2f1ef}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+       font:13px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  /* ---------------- 顶栏 ---------------- */
+  .top{height:42px;display:flex;align-items:center;gap:7px;padding:0 12px;
+       border-bottom:1px solid var(--line);background:var(--panel)}
+  .brand{font-weight:700;letter-spacing:.5px;margin-right:4px}
+  .tab{border:1px solid var(--line);background:#f7f6f4;border-radius:5px;
+       padding:3px 10px;cursor:pointer;font-size:12px;color:var(--muted)}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  button{border:1px solid var(--line);background:#f7f6f4;border-radius:5px;
+         padding:3px 9px;cursor:pointer;font-size:12px;color:var(--ink);white-space:nowrap}
+  button:hover:not(:disabled){border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{color:var(--warn)}
+  button.seg{background:#f7f6f4;color:var(--muted)}
+  button.seg.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .spacer{flex:1}
+  #status{font-size:11.5px;color:var(--muted);max-width:34%;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap}
+  /* ---------------- 主体：上 3 下 2 ---------------- */
+  .main{display:flex;height:calc(100vh - 42px);min-height:0;overflow:hidden}
+  .work{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;
+        padding:8px 10px 6px 12px}
+  .pane{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  #figpane{flex:3 1 0}
+  #datapane{flex:2 1 0}
+  .splitter{height:9px;flex:none;cursor:row-resize;display:flex;align-items:center;
+            justify-content:center}
+  .splitter::before{content:"";width:48px;height:3px;border-radius:2px;background:#dcd9d3}
+  .splitter:hover::before,.splitter.on::before{background:var(--accent)}
+  .panehead{display:flex;align-items:center;gap:6px;flex:none;min-height:32px;
+            flex-wrap:wrap;padding:3px 8px}   /* 窄窗口换行而不是把按钮裁掉 */
+  .ptitle{font-weight:600;font-size:12px;color:var(--muted);margin-right:2px}
+  .sep{width:1px;height:18px;background:var(--line);margin:0 2px;flex:none}
+  .hint{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;
+        text-overflow:ellipsis}
+  .chk{font-size:11.5px;display:flex;align-items:center;gap:3px;white-space:nowrap;color:var(--ink)}
+  select.tiny{width:96px}
+  select.mid{width:210px}
+  /* 窄屏：提示文字让位给功能按钮（提示内容在「?」帮助里都有） */
+  @media (max-width:1280px){ .panehead > .hint{display:none} }
+  @media (max-width:1100px){ .top > #status{max-width:150px} }
+  #status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+          max-width:380px;min-width:0;flex:none}
+  .reason{width:170px;flex:none}
+  /* ---------------- 图区 ---------------- */
+  #viewport{position:relative;flex:1;min-height:120px;border:1px solid var(--line);
+            background:#fff;overflow:hidden;border-radius:6px;cursor:grab}
+  #viewport.dragging{cursor:grabbing}
+  #stage{position:relative;transform-origin:0 0;background:#fff}
+  #svgbox,#svgbox svg{width:100%;height:100%;display:block}
+  #hotlayer{position:absolute;inset:0}
+  .hot{position:absolute;width:9px;height:9px;border-radius:50%;
+       transform:translate(-50%,-50%);cursor:pointer;background:transparent}
+  .hot:hover,.hot.sel{background:rgba(47,109,174,.28);
+       box-shadow:0 0 0 2px rgba(47,109,174,.65)}
+  /* 框选中的点：红色圈住，和单击选中的蓝圈区分开 */
+  .hot.pick{background:rgba(166,75,66,.30);box-shadow:0 0 0 2px rgba(166,75,66,.85)}
+  body.dragon .hot{cursor:move}
+  /* ---------------- 框选（拉框删点） ---------------- */
+  #marquee{position:absolute;border:1px dashed var(--accent);background:rgba(47,109,174,.10);
+           pointer-events:none;display:none;z-index:4;border-radius:2px}
+  body.boxsel #viewport{cursor:crosshair}
+  body.boxsel #hotlayer{pointer-events:none}
+  #boxbar{position:absolute;left:50%;top:5px;transform:translateX(-50%);display:none;
+          align-items:center;gap:5px;background:rgba(255,255,255,.97);
+          border:1px solid var(--line);border-radius:7px;padding:6px 8px;z-index:6;
+          box-shadow:0 6px 18px rgba(0,0,0,.13);font-size:11.5px;white-space:nowrap;
+          max-width:calc(100% - 14px);flex-wrap:wrap;justify-content:center;row-gap:5px}
+  #boxbar.show{display:flex}
+  #boxbar select{width:142px;padding:2px 2px;border:1px solid var(--line);
+                 border-radius:4px;font:inherit;font-size:11px;background:#fff;
+                 font-weight:600;text-overflow:ellipsis}
+  .curve.aim{background:#eef4fb;box-shadow:inset 3px 0 0 var(--accent);border-radius:3px}
+  .curve.hover{background:#f4f7fb}
+  #boxInfo{max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+           font-variant-numeric:tabular-nums}
+  #boxbar input{width:58px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;
+                font:inherit;font-size:11px}
+  #boxInfo{color:var(--ink)}
+  #boxInfo b{color:var(--warn)}
+  /* ---------------- 选线：单击一条曲线就选中它 ---------------- */
+  /* 放右上角：底部会压住 X 轴标题（试过，图上 Z'(Ω) 被挡了一半） */
+  #aimbar{position:absolute;right:8px;top:8px;display:none;
+          align-items:center;gap:6px;background:rgba(255,255,255,.97);
+          border:1px solid var(--line);border-radius:7px;padding:5px 8px;z-index:6;
+          box-shadow:0 6px 18px rgba(0,0,0,.13);font-size:11.5px;white-space:nowrap;
+          max-width:calc(100% - 16px)}
+  #aimbar.show{display:flex}
+  #aimbar .sw{width:10px;height:10px;border-radius:50%;flex:none;
+              box-shadow:0 0 0 2px rgba(0,0,0,.06)}
+  #aimbar .nm{font-weight:600;max-width:330px;overflow:hidden;text-overflow:ellipsis}
+  #aimbar .n{color:var(--muted);font-variant-numeric:tabular-nums}
+  #aimbar button{font-size:11px;padding:2px 7px;line-height:1.5}
+  #svgbox [id^="cv"]{transition:opacity .12s linear}
+  /* 图层对象：标注字母与自由文字，只有开启「✎ 图层」后可拖 */
+  .ahot,.thot{position:absolute;transform:translate(-2px,-100%);padding:1px 3px;
+       border:1px dashed transparent;border-radius:3px;font-size:11px;
+       white-space:nowrap;display:none;cursor:move;user-select:none;background:rgba(255,255,255,.72)}
+  body.layeron .ahot,body.layeron .thot{display:block}
+  .ahot:hover,.thot:hover{border-color:var(--accent);background:#fff}
+  .ahot.dragging,.thot.dragging{border-color:var(--accent);background:#e8f1fc}
+  .inlineedit{position:absolute;z-index:9;font:12px inherit;padding:2px 4px;
+       border:1px solid var(--accent);border-radius:3px;background:#fff;
+       box-shadow:0 2px 8px rgba(0,0,0,.12);min-width:90px}
+  #resizeHandle{position:absolute;right:5px;bottom:5px;width:15px;height:15px;z-index:5;
+       cursor:nwse-resize;border:1px solid var(--line);border-radius:3px;
+       background:linear-gradient(135deg,transparent 45%,var(--accent) 46%,var(--accent) 54%,transparent 55%)}
+  #tip{position:fixed;pointer-events:none;background:#26262a;color:#fff;font-size:11.5px;
+       padding:5px 8px;border-radius:4px;display:none;z-index:99;white-space:nowrap}
+  #thumbbar{display:flex;gap:7px;align-items:center;height:58px;flex:none;overflow-x:auto;
+            border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+  #thumbbar img{height:44px;border:1px solid var(--line);border-radius:3px;background:#fff;
+                cursor:zoom-in}
+  #thumbbar .hint{margin-left:4px}
+  /* ---------------- 数据区 ---------------- */
+  #sheetBox{flex:1;overflow:auto;border:1px solid var(--line);background:#fff;border-radius:6px}
+  #sheetBox table{border-collapse:collapse;width:100%;font-size:11.5px}
+  #sheetBox th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;
+               border-bottom:1px solid var(--line);border-right:1px solid var(--line);
+               padding:4px 7px;text-align:left;white-space:nowrap}
+  #sheetBox td{border-bottom:1px solid #f2f1ef;border-right:1px solid #f5f4f2;
+               padding:2px 7px;white-space:nowrap;cursor:cell}
+  #sheetBox td.num{text-align:right;font-family:Consolas,"Courier New",monospace;width:1%}
+  #sheetBox td.ro{color:var(--muted);cursor:default;background:#fafaf9;font-size:10.5px;width:1%}
+  #sheetBox th{white-space:nowrap}
+  #sheetBox th:last-child,#sheetBox td:last-child{width:auto;min-width:180px}
+  #sheetBox td.rowno{cursor:pointer;text-align:center;width:36px;color:var(--muted);
+                     background:#fafaf9;font-size:10.5px}
+  #sheetBox tr.selrow td{background:#e8f1fc}
+  #sheetBox tr.selrow td.rowno{background:#cfe1f7;color:var(--accent);font-weight:700}
+  #sheetBox td.active{outline:2px solid var(--accent);outline-offset:-2px}
+  #sheetBox tr.excluded td.num{color:#b9a3a0;text-decoration:line-through}
+  #sheetBox td.chg{background:#fff6e2;color:#8a5a12;font-weight:600}
+  #sheetBox .flag{display:inline-block;padding:0 6px;border-radius:8px;font-size:10px;
+                  margin-right:4px}
+  #sheetBox .flag.ex{background:#fbeeec;color:var(--warn)}
+  #sheetBox .flag.ch{background:#fff3dd;color:#8a5a12}
+  #sheetBox td .celledit{width:100%;padding:1px 3px;font:inherit;border:1px solid var(--accent);
+                         border-radius:2px;outline:none}
+  #sheetBox.readonly td{cursor:default}
+  .fxbar{flex:none;font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  .fxbar summary{cursor:pointer;color:var(--muted);font-size:11.5px;outline:none}
+  .fxbar .fxrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px}
+  .fxbar label{display:flex;align-items:center;gap:4px;color:var(--ink);margin:0}
+  #sheetFoot{flex:none;font-size:11px;color:var(--muted);margin-top:5px;min-height:17px;
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #sheetFoot b{color:var(--ink)}
+  /* ---------------- 可收起侧栏 ---------------- */
+  .side{width:346px;flex:none;border-left:1px solid var(--line);background:var(--panel);
+        overflow-y:auto;padding:10px 13px 24px;transition:width .16s ease,padding .16s ease}
+  .side.collapsed{width:0;padding:0;border-left:0;overflow:hidden}
+  section{border:1px solid var(--line);border-radius:6px;margin-bottom:9px;padding:9px}
+  h3{margin:0 0 7px;font-size:12.5px;color:var(--accent);font-weight:600;
+     display:flex;align-items:center;gap:6px}
+  label{display:block;font-size:11px;color:var(--muted);margin-top:6px}
+  input,select{width:100%;border:1px solid var(--line);border-radius:4px;
+       padding:3px 6px;font-size:12px;background:#fff;color:var(--ink)}
+  .row{display:flex;gap:6px;align-items:center;margin-top:6px}
+  .row>*{flex:1;min-width:0}
+  .kv{display:grid;grid-template-columns:84px 1fr;gap:2px 8px;font-size:11.5px}
+  .kv b{font-weight:500;color:var(--muted)}
+  .curve{display:flex;align-items:center;gap:6px;padding:3px 0;
+         border-bottom:1px dashed var(--line);font-size:11px}
+  .curve:last-child{border-bottom:0}
+  .swatch{width:10px;height:10px;border-radius:2px;flex:none}
+  .letter{font-weight:700;width:13px;text-align:center;flex:none}
+  .cname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cnt{color:var(--muted);font-size:10.5px;white-space:nowrap}
+  .mini{padding:1px 5px;font-size:10.5px}
+  .objrow{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+  .objtext{flex:1;min-width:0;font-size:11.5px;padding:2px 5px}
+  .objsize{width:52px;flex:none;font-size:11px;padding:2px 4px}
+  .badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:10.5px;
+         background:#eef4ea;color:var(--ok)}
+  .badge.bad{background:#fbeeec;color:var(--warn)}
+  .fmts{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .fmts label{display:flex;align-items:center;gap:3px;margin:0;color:var(--ink);font-size:11.5px}
+  .fmts input{width:auto}
+  #archiveBox{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:7px;
+              word-break:break-all}
+  #archiveBox b{color:var(--ink)}
+  details.adv{border:1px solid var(--line);border-radius:6px;padding:9px;margin-bottom:9px}
+  details.adv summary{cursor:pointer;font-size:12.5px;color:var(--accent);font-weight:600;
+                      outline:none;list-style:none}
+  details.adv summary::-webkit-details-marker{display:none}
+  details.adv summary::before{content:"▸ ";color:var(--muted)}
+  details.adv[open] summary::before{content:"▾ "}
+  .note{font-size:10.5px;color:var(--muted);line-height:1.55;margin:6px 0 0;
+        padding:6px 7px;background:#fafaf9;border-radius:4px}
+  .note code{font-family:Consolas,monospace;color:var(--ink)}
+  /* ---------------- 左侧项目管理器（仿 Origin 的 Project Explorer） ---------------- */
+  .proj{width:234px;flex:none;border-right:1px solid var(--line);background:var(--panel);
+        display:flex;flex-direction:column;min-height:0;overflow:hidden;
+        transition:width .16s ease}
+  .proj.collapsed{width:0;border-right:0}
+  .pjhead{display:flex;align-items:center;gap:3px;padding:5px 7px;flex:none;
+          border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--muted)}
+  .pjhead .spacer{flex:1}
+  .pjcols{display:flex;font-size:10.5px;color:var(--muted);flex:none;
+          border-bottom:1px solid var(--line);padding:3px 8px;background:var(--soft)}
+  .pjcols span:first-child{flex:1}
+  #projTree{flex:1;overflow:auto;padding:4px 4px 24px;font-size:12px;user-select:none}
+  .pjrow{display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:4px;
+         cursor:pointer;white-space:nowrap}
+  .pjrow:hover{background:var(--soft)}
+  .pjrow.active{background:#e8f1fc}
+  .pjrow.active .pname{color:var(--accent);font-weight:600}
+  .pjrow .caret{width:11px;flex:none;text-align:center;color:var(--muted);font-size:10px}
+  .pjrow .ico{width:14px;flex:none;text-align:center;font-size:11px;opacity:.85}
+  .pjrow .pname{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .pjrow .ptype{color:var(--muted);font-size:10.5px;flex:none;padding-left:4px}
+  .pjrow .pacts{display:none;gap:1px;flex:none}
+  .pjrow:hover .pacts{display:flex}
+  .pjrow .pacts button{border:0;background:transparent;color:var(--muted);
+                       font-size:11px;line-height:13px;padding:0 3px;border-radius:3px}
+  .pjrow .pacts button:hover{background:#e8f1fc;color:var(--accent)}
+  .pjfig{padding-left:15px;font-size:11.5px}
+  .pjrow.drop{outline:1px dashed var(--accent);background:#eef4fb}
+  .pjempty{color:var(--muted);font-size:11px;padding:6px 8px;line-height:1.6}
+  /* ---------------- 文本框 ---------------- */
+  textarea{width:100%;border:1px solid var(--line);border-radius:4px;padding:4px 6px;
+           font:12px/1.5 inherit;background:#fff;color:var(--ink);resize:vertical}
+  /* ---------------- 曲线平移 / 选中 / 忙 ---------------- */
+  .ofs{font-size:10px;color:var(--warn);white-space:nowrap;flex:none}
+  /* 成品存哪儿：在导出面板里明确写出来，不用去猜 */
+  .outpath{font-size:11px;line-height:1.45;color:var(--muted);background:var(--soft);
+           border-radius:4px;padding:5px 7px;margin-top:7px;word-break:break-all;
+           border-left:3px solid var(--accent)}
+  .outpath b{color:var(--ink);font-weight:600}
+  .segchip{font-size:9.5px;color:#fff;background:var(--warn);border-radius:8px;
+           padding:0 5px;margin-left:3px;flex:none}
+  .ofs button{border:0;background:transparent;color:var(--muted);padding:0 2px;
+              font-size:10px;line-height:12px}
+  .ofs button:hover{color:var(--accent);background:transparent}
+  #sheetBox td.selcell{background:#dbe9fb}
+  #sheetBox tr.selrow td.selcell{background:#c7dcf6}
+  #sheetBox thead th.selhead{background:#dbe9fb;color:var(--accent)}
+  body.moveline #viewport{cursor:move}
+  body.moveline #hotlayer{pointer-events:none}
+  /* 选线模式：光标变十字，鼠标扫过哪条线哪条亮起来，点一下即选中 */
+  body.pickmode #viewport{cursor:crosshair}
+  body.busy #viewport{cursor:progress}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* ---------------- 帮助弹层（? 键 / 顶栏按钮） ---------------- */
+  #helpBtn{font-weight:700}
+  #helpOverlay{position:fixed;inset:0;background:rgba(30,30,30,.35);z-index:60;
+               display:none;align-items:center;justify-content:center}
+  #helpOverlay.show{display:flex}
+  #helpCard{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+            width:min(680px,92vw);max-height:82vh;overflow:auto;padding:18px 22px;
+            box-shadow:0 18px 50px rgba(0,0,0,.28);font-size:12.5px;line-height:1.55}
+  #helpCard h2{margin:0 0 8px;font-size:15px}
+  #helpCard h3{margin:14px 0 4px;font-size:12.5px;color:var(--accent)}
+  #helpCard table{border-collapse:collapse;width:100%;margin-top:4px}
+  #helpCard td,#helpCard th{border:1px solid var(--line);padding:4px 8px;text-align:left;
+            vertical-align:top;font-size:12px}
+  #helpCard th{background:var(--soft)}
+  #helpCard kbd{background:var(--soft);border:1px solid var(--line);border-radius:4px;
+            padding:0 5px;font-family:inherit;font-size:11.5px}
+  #helpClose{float:right}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">figlab</span>
+  <button id="toggleProj" title="收起/展开左侧项目管理器">⟨ 项目</button>
+  <span class="sep"></span>
+  <div id="tabs" style="display:flex;gap:5px"></div>
+  <button id="addTab">+ 新图</button>
+  <button id="delTab" class="danger">删除当前图</button>
+  <span class="spacer"></span>
+  <button id="undoBtn" title="Ctrl+Z 撤销一步">↶ 撤销</button>
+  <button id="redoBtn" title="Ctrl+Y 重做一步">↷ 重做</button>
+  <button id="toggleSide" title="收起/展开右侧属性栏">⟩ 侧栏</button>
+  <button id="helpBtn" title="操作说明与快捷键（? 键）">?</button>
+  <span id="status">载入中…</span>
+</div>
+
+<div class="main">
+  <!-- ======== 左：项目管理器 ======== -->
+  <aside class="proj" id="proj">
+    <div class="pjhead">
+      <span>项目管理器</span>
+      <span class="spacer"></span>
+      <button id="projNewFolder" class="mini" title="新建文件夹">＋ 文件夹</button>
+    </div>
+    <div class="pjcols"><span>名称</span><span>类型</span></div>
+    <div id="projTree"></div>
+    <div class="pjempty" style="padding:6px 8px;border-top:1px solid var(--line);flex:none">
+      双击改名 · 拖图到文件夹归类 · 点图打开
+    </div>
+  </aside>
+  <div class="work">
+    <!-- ======== 上：图 ======== -->
+    <div class="pane" id="figpane">
+      <div class="panehead">
+        <span class="ptitle">图</span>
+        <button data-zoom="in" title="放大">＋</button>
+        <button data-zoom="out" title="缩小">－</button>
+        <button id="fit">适应</button>
+        <button id="reset">1:1</button>
+        <span class="sep"></span>
+        <button id="layerToggle" title="开启后可直接拖动图上标注、双击改文字">✎ 图层</button>
+        <label class="chk"><input type="checkbox" id="dragToggle"> 拖点</label>
+        <select id="dragAxis" class="tiny" title="拖动数据点时改哪个轴">
+          <option value="Y">改 Y</option>
+          <option value="X">改 X</option>
+          <option value="XY">改 XY</option>
+        </select>
+        <button id="moveToggle" title="开启后按住任意曲线拖动：整条线平移，只改显示位置，数据不动">⇄ 移线</button>
+        <button id="aimToggle" title="点一下进入选线模式：鼠标扫过哪条线就高亮哪条，单击即选中；选中后可以「只看这条 / 删点 / 表 / 移线」去改它。Esc 退出">◎ 选线</button>
+        <button id="boxToggle" title="开启后按住鼠标拉一个框，框里的点全部选中，再点「不画这些点」或按 Delete 剔除；线多时先用「选线」点中一条，框选就只作用于这条">▭ 框选删点</button>
+        <button id="connectToggle" title="连线画法：散点 / 折线 / 平滑，点一下切换下一个（只改怎么连，数据一点不动）">连线 折线</button>
+        <span class="hint">点「选线」再点图上的线 = 选中 · 滚轮缩放 · 拖动平移 · 双击复位 · Shift+拖动=框选</span>
+        <span class="spacer"></span>
+        <button id="ratioFig" title="图区放大">图 ↑</button>
+        <button id="ratioDef" title="恢复上图下表 3:2">3:2</button>
+        <button id="ratioSheet" title="数据区放大">表 ↓</button>
+      </div>
+      <div id="viewport">
+        <div id="stage"><div id="svgbox"></div><div id="hotlayer"></div></div>
+        <div id="marquee"></div>
+        <div id="boxbar">
+          <select id="boxCurve" title="框选只作用于这条曲线；选「全部曲线」= 不限（框选模式里单击某条线也能锁定）"></select>
+          <span id="boxInfo">框选 0 点</span>
+          <input id="boxReason" placeholder="理由" title="默认「框选剔除」；会写进该行备注与台账">
+          <button id="boxExclude" class="danger" title="只从图上剔除这些点：数据保留，曲线在此断开；工作表点「恢复」或 Ctrl+Z 可回来（快捷键 Delete / ⏎）">不画 ⏎</button>
+          <button id="boxDelete" class="danger" title="从工作副本里彻底删掉这些行，Ctrl+Z 可撤销。注意：行没了就不会留断点，两侧点会直接相连（快捷键 Shift+Delete）">删行</button>
+          <button id="boxCancel" title="取消（Esc）">×</button>
+        </div>
+        <div id="aimbar">
+          <span class="sw" id="aimSw"></span>
+          <span class="nm" id="aimName"></span>
+          <span class="n" id="aimCnt"></span>
+          <button id="aimFocus" title="只显示这条曲线（其它曲线隐藏）；再点一次按原样恢复，不改数据">只看这条</button>
+          <button id="aimBox" class="mini" title="只对这一条线框选删点：点了以后拉个框，框里的点只从这条线剔除，别的线不受影响">删点</button>
+          <button id="aimSheet" class="mini" title="跳到这条曲线的工作副本表格">表</button>
+          <button id="aimClose" title="取消选择（Esc）">×</button>
+        </div>
+        <div id="resizeHandle" title="拖动改画布物理尺寸并重绘"></div>
+      </div>
+      <div id="thumbbar"></div>
+    </div>
+
+    <div class="splitter" id="splitter" title="拖动调整图与数据的比例（双击恢复 3:2）"></div>
+
+    <!-- ======== 下：数据 ======== -->
+    <div class="pane" id="datapane">
+      <div class="panehead">
+        <button id="srcWork" class="seg on" title="绘图实际使用的数据，可编辑">处理后</button>
+        <button id="srcRaw" class="seg" title="源文件解析出的只读快照">原始快照</button>
+        <span class="sep"></span>
+        <label class="chk">曲线 <select id="sheetCurve" class="mid"></select></label>
+        <button id="shInsert">插入行</button>
+        <button id="shDelete" class="danger">删除</button>
+        <button id="shExclude" class="danger">排除</button>
+        <button id="shRestore">恢复</button>
+        <input id="sheetReason" class="reason" placeholder="理由（排除必填）">
+        <span class="spacer"></span>
+        <button id="shLocate">在图中定位</button>
+      </div>
+      <details class="fxbar" id="fxbar">
+        <summary>公式填充 / 批量改值（Origin 的 Set Column Values）</summary>
+        <div class="fxrow">
+          <label>列 <select id="sheetField" style="width:110px"></select></label>
+          <label>表达式 <input id="sheetExpr" placeholder="x*1.05 或 Zp_ohm+2*i" style="width:220px"></label>
+          <button id="shFormula">填充选中行（未选则整列）</button>
+          <span class="hint">x = 本列原值，i = 行号；不走 eval，写 import 会被拒</span>
+        </div>
+      </details>
+      <div id="sheetBox"></div>
+      <div id="sheetFoot"></div>
+    </div>
+  </div>
+
+  <!-- ======== 右：可收起属性栏 ======== -->
+  <aside class="side" id="side">
+    <section>
+      <h3>① 选中的点 <span id="selBadge" class="badge">未选中</span></h3>
+      <div id="pointPanel"><div class="kv"><b>提示</b><span>点击图上任意数据点</span></div></div>
+      <div id="pointForm" style="display:none">
+        <label>改数值（字段 / 新值）</label>
+        <div class="row">
+          <select id="ptField"><option value="Zp_ohm">Z' (Ω)</option><option value="Zpp_ohm">Z'' (Ω)</option><option value="freq_Hz">频率 (Hz)</option></select>
+          <input id="ptValue" placeholder="新数值">
+        </div>
+        <label>备注 / 排除理由（排除必填）</label>
+        <input id="ptReason" placeholder="理由">
+        <div class="row" style="margin-top:8px">
+          <button id="btnVal">改数值</button>
+          <button id="btnNote">写备注</button>
+        </div>
+        <div class="row">
+          <button id="btnEx" class="danger">排除</button>
+          <button id="btnRe">恢复</button>
+        </div>
+        <div class="row"><button id="btnLocate">在工作表中定位此点</button></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>② 曲线 <span class="cnt" id="curveCount"></span></h3>
+      <div id="curveList"></div>
+    </section>
+
+    <section>
+      <h3>③ 图层与标注</h3>
+      <label>X 轴标题</label>
+      <input id="axTitleX">
+      <label>Y 轴标题</label>
+      <input id="axTitleY">
+      <div class="row" style="margin-top:6px">
+        <button id="applyAxis">应用轴标题</button>
+        <button id="addText">＋ 加文字</button>
+      </div>
+      <div id="objList" style="margin-top:7px"></div>
+      <p class="note" style="margin:6px 0 0;font-size:11px;color:var(--muted)">
+        点图区「✎ 图层」后：拖动标注改位置，双击标注改文字。
+        拖过的标注会锁定位置，不再被自动避让弹走。</p>
+    </section>
+
+    <section>
+      <h3>④ 导出</h3>
+      <div class="fmts">
+        <label><input type="checkbox" class="fmt" value="pdf" checked disabled> PDF（默认）</label>
+        <label><input type="checkbox" class="fmt" value="eps"> EPS</label>
+        <label><input type="checkbox" class="fmt" value="svg"> SVG</label>
+        <label><input type="checkbox" class="fmt" value="png"> PNG</label>
+      </div>
+      <p class="note" style="margin:4px 0 0;font-size:11px;color:var(--muted)">
+        只勾要交付的格式；网页缩略图与机器核验用的 PNG 预览会自动另存，不算交付件。</p>
+      <label>文件名（不带扩展名）</label>
+      <input id="expName" placeholder="20261113阻抗作图">
+      <label class="chk" style="margin-top:6px"><input id="expAuto" type="checkbox" style="width:auto"> 按日期自动命名（日期+类别+作图）</label>
+      <div class="row" style="margin-top:6px"><button id="applyName">应用文件名</button></div>
+      <div id="outPath" class="outpath" title="PDF / PPT / 项目文件都放在这个文件夹里"></div>
+      <button id="btnExport" class="primary" style="margin-top:8px;width:100%">导出到桌面并核验</button>
+      <div id="verifyBox" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnFolder" class="mini">打开成品文件夹</button>
+        <button id="btnOutFolder" class="mini">本图输出目录</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button id="btnSaveProj" class="mini" title="把这张图（规格+数据）存成 .figlab 单文件，放同一个成品文件夹">保存项目</button>
+        <button id="btnOpenProj" class="mini" title="选一个 .figlab 项目文件，恢复成一张可继续改的图">打开项目</button>
+        <input id="projFile" type="file" accept=".figlab,application/json" hidden>
+      </div>
+      <div id="archiveBox"></div>
+    </section>
+
+    <section>
+      <h3>⑤ 出 PPT</h3>
+      <div class="row">
+        <button id="btnPptx" class="primary">生成 PPT（本图一页）</button>
+      </div>
+      <label>幻灯片标题（留空 = 图名）</label>
+      <input id="pptTitle" placeholder="20261113阻抗作图">
+      <label>副标题（可不填）</label>
+      <input id="pptSub" placeholder="例：3 电极 · 0.1 M Na₂SO₄ · 25 ℃">
+      <p class="note" style="margin:6px 0 0;font-size:10.5px">
+        图按 1200 dpi 嵌入，16:9 整页摆正；图上挂了回链：
+        <b>放映时单击、编辑时 Ctrl+单击</b> → 回到 figlab 改数据。</p>
+      <details class="adv" style="margin:8px 0 0">
+        <summary>追加到已有 PPT</summary>
+        <label>归档里的 PPT</label>
+        <select id="pptTarget"><option value="">（新建一份）</option></select>
+        <label>或填绝对路径</label>
+        <input id="pptPath" placeholder="例如：C://Users//我//Desktop//组会.pptx">
+        <button id="btnPptxAppend" style="margin-top:6px;width:100%">追加一页到这份 PPT</button>
+        <p class="note" style="margin:5px 0 0;font-size:10.5px">
+          目标文件正被 PowerPoint/WPS 打开时会写入失败，关掉再点一次。</p>
+      </details>
+      <div id="pptBox" style="margin-top:7px;font-size:11px;color:var(--muted);
+                              line-height:1.5;word-break:break-all"></div>
+    </section>
+
+    <details class="adv">
+      <summary>版式与算法（一般不用动）</summary>
+      <p class="note">这些参数建议由 AI 直接改规格文件 <code>specs/&lt;图ID&gt;.json</code>。
+        在界面上改只会写入本图的 overrides，不改预设。</p>
+      <p class="note">当前算法（处理层，AI 维护）：弧顶 = 频率下降方向第一个局部极大；
+        Rs = 高频首点实部；Rct = 2×(弧顶实部 − Rs)；鞍点 = 弧顶后第一个局部极小；
+        截尾 = 固定欧姆数，使各曲线尾段等长。</p>
+      <label>预设（只读）</label>
+      <input id="vPreset" readonly>
+      <div class="row">
+        <div><label>画布宽 cm</label><input id="vW" type="number" step="0.1"></div>
+        <div><label>画布高 cm</label><input id="vH" type="number" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div><label>X 起</label><input id="vX0" placeholder="自动"></div>
+        <div><label>X 止</label><input id="vX1" placeholder="自动"></div>
+      </div>
+      <div class="row">
+        <div><label>Y 起</label><input id="vY0" placeholder="自动"></div>
+        <div><label>Y 止</label><input id="vY1" placeholder="自动"></div>
+      </div>
+      <div class="row">
+        <div><label>字体</label><input id="vFont"></div>
+        <div><label>刻度 pt</label><input id="vTick" type="number" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div><label>标题 pt</label><input id="vTitle" type="number" step="0.5"></div>
+        <div><label>符号 pt</label><input id="vMark" type="number" step="0.2"></div>
+      </div>
+      <div class="row">
+        <div><label>曲线线宽 pt</label><input id="vLine" type="number" step="0.1"></div>
+        <div><label>截尾长度 Ω</label><input id="vTail" type="number" step="5"></div>
+      </div>
+      <div class="row">
+        <div><label>圆拟合</label><select id="vFit"><option value="0">关闭</option><option value="1">参考弧</option></select></div>
+      </div>
+      <div class="row">
+        <label class="chk" style="margin:0"><input id="vEqual" type="checkbox"> 两轴等比（与铺满互斥）</label>
+      </div>
+      <div class="row">
+        <div><label>连线画法</label><select id="vConnect" title="散点=只画符号；折线=实测点直连；平滑=过实测点的插值曲线">
+          <option value="scatter">散点（只符号）</option>
+          <option value="segment">折线（点直连）</option>
+          <option value="smooth">平滑（过点插值）</option>
+        </select></div>
+      </div>
+      <div class="row">
+        <label class="chk" style="margin:0"><input id="vBreak" type="checkbox"> 剔除处断线（不跨被删点连直线）</label>
+      </div>
+      <button id="applyView" class="primary" style="margin-top:8px;width:100%">应用并重新导出核验</button>
+    </details>
+  </aside>
+</div>
+<div id="tip"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const PX_PER_CM = 96 / 2.54 * 2.2;
+let S = {fid:null, spec:null, points:[], range:null, zoom:1, panX:0, panY:0,
+         selected:null, figures:[], src:'work', ratio:0.6,
+         annotations:[], texts:[], layerMode:false, moveMode:false, boxMode:false,
+         picked:[], segments:{}, lineVerts:{}, curveGids:{},
+         aim:null, lastBox:null, boxCurveList:[], click0:null,
+         pickMode:false, hoverCurve:null,
+         aimFocus:null, aimPrevInc:null,
+         figureDir:'', outDir:'',
+         sheet:{data:null, raw:null, curve:null, sel:new Set(), active:null,
+                anchor:null, focus:null, cell:null, colRange:null, drag:null,
+                sheetFocus:false}};
+let drag = null, resize = null, pdrag = null, splitDrag = null, adrag = null;
+let mdrag = null, expTimer = null, expBusy = false, bdrag = null, aimTimer = null;
+
+async function get(u){ const r = await fetch(u); return r.json(); }
+async function post(u, b){
+  const r = await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                           body:JSON.stringify(b)});
+  return r.json();
+}
+function setStatus(t){ $('status').textContent = t; }
+let busyN = 0;
+function markBusy(on){
+  busyN = Math.max(0, busyN + (on ? 1 : -1));
+  document.body.classList.toggle('busy', busyN > 0);
+}
+function num(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function srcData(){ return S.src === 'raw' ? S.sheet.raw : S.sheet.data; }
+function cols(){ const d = srcData(); return d ? (d.numeric_columns || []) : []; }
+
+/* ====================== 页签 ====================== */
+async function loadFigures(){
+  const d = await get('/api/figures');
+  S.figures = d.figures || [];
+  const box = $('tabs'); box.innerHTML = '';
+  S.figures.forEach(f=>{
+    const b = document.createElement('button');
+    b.className = 'tab' + (f.id === S.fid ? ' active' : '');
+    b.textContent = f.id;
+    b.title = f.id;
+    b.onclick = () => loadFigure(f.id);
+    box.appendChild(b);
+  });
+}
+
+/* ====================== 项目管理器：文件夹 + 图窗口 ======================
+   一张图 = 一个窗口，窗口归到文件夹。要的就是「一个项目里装很多任务」，
+   不用为每张图单开一个对话。 */
+let P = {tree:{root:'figlab 项目', folders:[], figures:[]}, sel:null, dragFig:null};
+
+async function loadProject(){
+  try { P.tree = await get('/api/project'); } catch(e){ return; }
+  renderProject();
+}
+function figsIn(fid){ return (P.tree.figures || []).filter(f => f.folder === fid); }
+function renderProject(){
+  const box = $('projTree'); if(!box) return;
+  const t = P.tree || {folders:[], figures:[]};
+  box.innerHTML = '';
+  const root = document.createElement('div');
+  root.className = 'pjrow';
+  root.innerHTML = '<span class="caret"></span><span class="ico">▣</span>' +
+                   '<span class="pname">' + esc(t.root || 'figlab 项目') + '</span>' +
+                   '<span class="ptype">' + (t.figures||[]).length + '</span>';
+  box.appendChild(root);
+  (t.folders || []).forEach(f=>{
+    const row = document.createElement('div');
+    row.className = 'pjrow';
+    row.dataset.folder = f.id;
+    row.innerHTML =
+      '<span class="caret">' + (f.open === false ? '▸' : '▾') + '</span>' +
+      '<span class="ico">📁</span>' +
+      '<span class="pname">' + esc(f.name) + '</span>' +
+      '<span class="ptype">' + figsIn(f.id).length + '</span>' +
+      '<span class="pacts"><button data-act="rename" title="改文件夹名">✎</button>' +
+      '<button data-act="del" title="删除文件夹（里面的图退回第一个）">×</button></span>';
+    row.querySelector('.caret').onclick = ev=>{ ev.stopPropagation();
+      projOp({op:'toggle-folder', id:f.id}); };
+    row.querySelector('.pname').onclick = ()=>{ P.sel = f.id; renderProject(); };
+    row.querySelector('.pname').ondblclick = ev=>{ ev.stopPropagation(); renameFolder(f); };
+    row.querySelector('[data-act=rename]').onclick = ev=>{ ev.stopPropagation(); renameFolder(f); };
+    row.querySelector('[data-act=del]').onclick = ev=>{ ev.stopPropagation(); deleteFolder(f); };
+    row.ondragover = ev=>{ ev.preventDefault(); row.classList.add('drop'); };
+    row.ondragleave = ()=> row.classList.remove('drop');
+    row.ondrop = ev=>{
+      ev.preventDefault(); row.classList.remove('drop');
+      const id = ev.dataTransfer.getData('text/plain') || P.dragFig;
+      if(id) projOp({op:'move-figure', id:id, folder:f.id});
+    };
+    box.appendChild(row);
+    if(f.open !== false) figsIn(f.id).forEach(fig => box.appendChild(figRow(fig)));
+  });
+  if(!(t.figures||[]).length){
+    const e = document.createElement('div');
+    e.className = 'pjempty';
+    e.textContent = '还没有图。点顶栏「+ 新图」建一个窗口。';
+    box.appendChild(e);
+  }
+}
+function figRow(fig){
+  const row = document.createElement('div');
+  row.className = 'pjrow pjfig' + (fig.id === S.fid ? ' active' : '');
+  row.draggable = true;
+  row.title = fig.id + '（双击改名）';
+  row.innerHTML = '<span class="caret"></span><span class="ico">📈</span>' +
+    '<span class="pname">' + esc(fig.title || fig.id) + '</span>' +
+    '<span class="ptype">' + (fig.exists ? '图' : '缺') + '</span>';
+  row.onclick = ()=> loadFigure(fig.id);
+  row.ondblclick = ev=>{ ev.stopPropagation(); renameFigure(fig); };
+  row.ondragstart = ev=>{
+    P.dragFig = fig.id;
+    ev.dataTransfer.setData('text/plain', fig.id);
+    ev.dataTransfer.effectAllowed = 'move';
+  };
+  row.ondragend = ()=> { P.dragFig = null; };
+  return row;
+}
+async function projOp(body){
+  const d = await post('/api/project', body);
+  if(d.project){ P.tree = d.project; renderProject(); await loadFigures(); }
+  if(d.error){ setStatus('项目操作失败：' + d.error); return d; }
+  return d;
+}
+function renameFolder(f){
+  const v = prompt('文件夹名：', f.name);
+  if(v === null) return;
+  projOp({op:'rename-folder', id:f.id, name:v});
+}
+function deleteFolder(f){
+  if(!confirm('删除文件夹「' + f.name + '」？里面的图会退回第一个文件夹，不会丢。')) return;
+  projOp({op:'delete-folder', id:f.id});
+}
+function renameFigure(fig){
+  const v = prompt('这张图在项目管理器里显示的名字（不改导出文件名）：', fig.title || fig.id);
+  if(v === null) return;
+  projOp({op:'rename-figure', id:fig.id, title:v});
+}
+
+/* ====================== 出 PPT ====================== */
+async function loadPptTargets(){
+  const sel = $('pptTarget'); if(!sel) return;
+  let d = {files:[]};
+  try { d = await get('/api/pptx/list'); } catch(e){}
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">（新建一份）</option>';
+  (d.files || []).forEach(f=>{
+    const o = document.createElement('option');
+    o.value = f.path; o.textContent = (f.folder || f.day || '') + ' · ' + f.name;
+    sel.appendChild(o);
+  });
+  if(cur) sel.value = cur;
+}
+async function doPptx(mode){
+  if(!S.fid){ setStatus('先选一张图'); return; }
+  const body = {figure: S.fid, mode: mode || 'new',
+                // 界面这一版规格整份带上：工作台是散点，PPT 里就必须是散点
+                spec: S.spec,
+                url: location.origin + '/?fig=' + encodeURIComponent(S.fid),
+                caption: $('pptTitle').value.trim() || null,
+                subtitle: $('pptSub').value.trim()};
+  if(mode === 'append'){
+    body.path = ($('pptPath').value.trim() || $('pptTarget').value || '');
+    if(!body.path){ setStatus('先在下拉里选一份归档 PPT，或直接填绝对路径'); return; }
+  }
+  $('pptBox').textContent = '正在渲染并生成 PPT…';
+  const d = await post('/api/pptx', body);
+  if(!d.ok){
+    $('pptBox').innerHTML = '<span style="color:var(--warn)">生成失败：' +
+      esc(d.error || '未知错误') + '</span>';
+    setStatus('出 PPT 失败：' + (d.error || ''));
+    return;
+  }
+  const ins = d.inspect || {};
+  $('pptBox').innerHTML =
+    '已生成 <b>' + esc(d.path) + '</b><br>' +
+    Math.round((d.bytes || 0) / 1024) + ' KB · 第 ' + d.slide_index + ' 页 / 共 ' +
+    (ins.n || '?') + ' 页 · 图 ' + d.pic_in[0] + '×' + d.pic_in[1] + ' 英寸' +
+    '<br>图片名 <code>' + esc(d.picture) + '</code>（回链在图片上）' +
+    (d.handoff && d.handoff.ok ? '<br>成品文件夹：' + esc(d.handoff.dir || '') : '') +
+    (d.project_file && d.project_file.ok ? '<br>项目文件：' + esc(d.project_file.path) : '');
+  setStatus('PPT 已生成：' + d.path + '（放映单击图即可回到这里）');
+  await loadPptTargets();
+}
+
+function baseStageSize(){
+  const w = S.spec.page.w_cm * PX_PER_CM, h = S.spec.page.h_cm * PX_PER_CM;
+  $('stage').style.width = w + 'px'; $('stage').style.height = h + 'px';
+  $('svgbox').style.width = w + 'px'; $('svgbox').style.height = h + 'px';
+}
+function applyTransform(){
+  $('stage').style.transform =
+    'translate(' + S.panX + 'px,' + S.panY + 'px) scale(' + S.zoom + ')';
+}
+function fitView(){
+  const vp = $('viewport'), w = $('stage').offsetWidth || 1, h = $('stage').offsetHeight || 1;
+  const z = Math.min((vp.clientWidth - 26) / w, (vp.clientHeight - 26) / h);
+  S.zoom = Math.min(4, Math.max(0.2, z));
+  S.panX = (vp.clientWidth - w * S.zoom) / 2;
+  S.panY = (vp.clientHeight - h * S.zoom) / 2;
+  applyTransform();
+}
+async function loadFigure(id){
+  markBusy(true);
+  try{
+    const d = await get('/api/figure?id=' + encodeURIComponent(id));
+    if(d.error){ setStatus('错误：' + d.error); return; }
+    S.fid = id; S.spec = d.spec; S.points = d.points || []; S.range = d.effective_range;
+    S.annotations = d.annotations || []; S.texts = d.texts || [];
+    S.segments = d.segments || {}; clearBoxSel();
+    S.lineVerts = d.line_vertices || {};
+    S.curveGids = d.curve_gids || {};
+    S.figureDir = d.figure_dir || ''; S.outDir = d.output_dir || '';
+    S.selected = null;
+    S.aim = null; S.aimFocus = null; S.aimPrevInc = null;   // 换图不留上一张的选中
+    S.pickMode = false; S.hoverCurve = null;                // 选线模式也不跨图
+    document.body.classList.remove('pickmode');
+    if($('aimToggle')) $('aimToggle').classList.remove('on');
+    $('svgbox').innerHTML = d.svg;
+    baseStageSize(); buildHot(); fillPoint(null); fillCurves(); fillView(); fillLayer(); fillExport();
+    paintAim();
+    fitView();
+    // 这几件事互不依赖，一起发出去，别一条一条等
+    await Promise.all([loadThumbs(), loadWorkbook(), loadRaw(), loadFigures(),
+                       loadProject()]);
+    setStatus('图 ' + id + ' · ' + S.points.length + ' 个数据点 · ' +
+              d.spec.page.w_cm + '×' + d.spec.page.h_cm + ' cm');
+    $('verifyBox').textContent = '';
+    $('archiveBox').textContent = '';
+    showArchive(null);
+  } finally { markBusy(false); }
+}
+
+/* ====================== 图上热区 ====================== */
+function buildHot(){
+  const layer = $('hotlayer'); layer.innerHTML = '';
+  S.points.forEach((p,i)=>{
+    const el = document.createElement('div');
+    el.className = 'hot'; el.dataset.i = i;
+    el.style.left = (p.nx*100) + '%'; el.style.top = (p.ny*100) + '%';
+    el.onmouseenter = e => showTip(e,p);
+    el.onmousemove = e => showTip(e,p);
+    el.onmouseleave = hideTip;
+    el.onmousedown = e => onHotDown(e,i);
+    el.onclick = e => { e.stopPropagation(); if(!$('dragToggle').checked) selectPoint(i); };
+    layer.appendChild(el);
+  });
+  buildObjHot();
+}
+
+/* ====================== 图层对象：标注文字 / 自由文字 ====================== */
+function buildObjHot(){
+  const layer = $('hotlayer');
+  layer.querySelectorAll('.ahot,.thot').forEach(e => e.remove());
+  (S.annotations || []).forEach((a,i)=>{
+    if(a.hidden) return;
+    const s = S.spec.series.find(x => x.curve === a.curve) || {};
+    const el = document.createElement('div');
+    el.className = 'ahot'; el.dataset.obj = 'annot:' + i;
+    el.textContent = a.text || a.letter;
+    el.style.left = (a.nx * 100) + '%'; el.style.top = (a.ny * 100) + '%';
+    el.style.color = s.color || '#333';
+    el.title = a.curve + ' 的末端标注：拖动改位置，双击改文字';
+    el.addEventListener('mousedown', e => onObjDown(e, 'annot', i));
+    el.addEventListener('dblclick', e => { e.stopPropagation(); editObj('annot', i, el); });
+    layer.appendChild(el);
+  });
+  (S.texts || []).forEach((t,i)=>{
+    const el = document.createElement('div');
+    el.className = 'thot'; el.dataset.obj = 'text:' + i;
+    el.textContent = t.text;
+    el.style.left = (t.nx * 100) + '%'; el.style.top = (t.ny * 100) + '%';
+    el.style.color = t.color || '#222';
+    el.title = '自由文字：拖动改位置，双击改文字';
+    el.addEventListener('mousedown', e => onObjDown(e, 'text', i));
+    el.addEventListener('dblclick', e => { e.stopPropagation(); editObj('text', i, el); });
+    layer.appendChild(el);
+  });
+}
+
+function stageNorm(e){
+  const r = $('stage').getBoundingClientRect();
+  return {nx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+          ny: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))};
+}
+function onObjDown(e, kind, i){
+  if(!S.layerMode) return;                 // 未开启图层模式时只显示，不抢拖拽
+  e.stopPropagation(); e.preventDefault();
+  adrag = {kind, i, el: e.currentTarget, moved: false};
+  adrag.el.classList.add('dragging');
+}
+function editObj(kind, i, el){
+  const cur = kind === 'annot' ? (S.annotations[i].text || '') : S.texts[i].text;
+  const inp = document.createElement('input');
+  inp.className = 'inlineedit'; inp.value = cur;
+  const st = $('stage').getBoundingClientRect(), vp = $('viewport').getBoundingClientRect();
+  inp.style.left = Math.max(4, st.left - vp.left + parseFloat(el.style.left) / 100 * st.width) + 'px';
+  inp.style.top = Math.max(4, st.top - vp.top + parseFloat(el.style.top) / 100 * st.height - 28) + 'px';
+  $('viewport').appendChild(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if(done) return; done = true;
+    const v = inp.value.trim(); inp.remove();
+    if(ok && v && v !== cur) saveObj(kind, i, {text: v});
+  };
+  inp.onkeydown = e => {
+    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key === 'Escape'){ finish(false); }
+  };
+  inp.onblur = () => finish(true);
+}
+async function saveObj(kind, i, patch){
+  if(kind === 'annot'){
+    const a = S.annotations[i];
+    const series = S.spec.series.map(s => Object.assign({}, s));
+    const s = series.find(x => x.curve === a.curve);
+    if(!s) return;
+    Object.assign(s, patch);
+    await postSpec({series});
+  }else{
+    const texts = (S.texts || []).map(t => Object.assign({}, t));
+    Object.assign(texts[i], patch);
+    await postSpec({texts});
+  }
+}
+async function postSpec(patch, full){
+  markBusy(true);
+  try{
+    const d = await post('/api/spec', {figure:S.fid, patch:patch, fast: !full});
+    if(!d.ok){ setStatus('规格校验失败：' + (d.problems || []).join('；')); return null; }
+    await applyRender(d);
+    if(!full) scheduleExport();
+    return d;
+  } finally { markBusy(false); }
+}
+function resetAnnot(curve){
+  const series = S.spec.series.map(s => Object.assign({}, s));
+  const s = series.find(x => x.curve === curve);
+  if(!s) return;
+  s.annot_locked = false; s.annot_dx_pt = 7; s.annot_dy_pt = 0;
+  postSpec({series});
+}
+function fillLayer(){
+  const s = S.spec;
+  $('axTitleX').value = s.axis.x_title;
+  $('axTitleY').value = s.axis.y_title;
+  const box = $('objList'); box.innerHTML = '';
+  const colorOf = c => (s.series.find(x => x.curve === c) || {}).color || '#888';
+  (S.annotations || []).forEach((a,i)=>{
+    if(a.hidden) return;                 // 曲线被移出图框时标注不画，也就不列
+    const row = document.createElement('div'); row.className = 'objrow';
+    row.innerHTML = '<span class="swatch" style="background:' + colorOf(a.curve) + '"></span>';
+    const inp = document.createElement('input');
+    inp.className = 'objtext'; inp.value = a.text || a.letter;
+    inp.onchange = () => { const v = inp.value.trim(); if(v && v !== a.text) saveObj('annot', i, {text:v}); };
+    const b = document.createElement('button');
+    b.className = 'mini'; b.textContent = a.locked ? '复位' : '自动';
+    b.title = a.locked ? '恢复自动避让' : '当前自动避让；拖动后锁定位置';
+    b.onclick = () => a.locked ? resetAnnot(a.curve)
+                              : setStatus('该标注仍在自动避让：开启「✎ 图层」拖动一下即可锁定位置');
+    row.appendChild(inp); row.appendChild(b); box.appendChild(row);
+  });
+  (S.texts || []).forEach((t,i)=>{
+    const row = document.createElement('div'); row.className = 'objrow';
+    const inp = document.createElement('input');
+    inp.className = 'objtext'; inp.value = t.text;
+    inp.onchange = () => { const v = inp.value.trim(); if(v && v !== t.text) saveObj('text', i, {text:v}); };
+    const sz = document.createElement('input');
+    sz.type = 'number'; sz.step = '0.5'; sz.value = t.size_pt || s.style.tick_pt;
+    sz.className = 'objsize'; sz.title = '字号 pt';
+    sz.onchange = () => saveObj('text', i, {size_pt: parseFloat(sz.value) || s.style.tick_pt});
+    const del = document.createElement('button');
+    del.className = 'mini danger'; del.textContent = '删';
+    del.onclick = () => postSpec({texts: (S.texts || []).filter((_,k) => k !== i)});
+    row.appendChild(inp); row.appendChild(sz); row.appendChild(del); box.appendChild(row);
+  });
+  if(!(S.annotations || []).length && !(S.texts || []).length)
+    box.innerHTML = '<span class="hint">暂无标注对象</span>';
+}
+function fillExport(){
+  const ex = S.spec.export || {};
+  const fmts = (ex.formats || []).map(String);
+  document.querySelectorAll('.fmt').forEach(c=>{
+    if(c.value !== 'pdf') c.checked = fmts.indexOf(c.value) >= 0;
+  });
+  $('expName').value = ex.base || '';
+  $('expAuto').checked = !!ex.auto_name;
+  paintOutPath();
+}
+/* 成品存哪儿，直接写在面板上：桌面\FigLab\<图名>\ 里放 PDF / PPT / .figlab */
+function paintOutPath(){
+  const box = $('outPath'); if(!box) return;
+  const dir = S.figureDir || '';
+  const base = (S.spec && S.spec.export && S.spec.export.base) || '';
+  if(!dir){ box.textContent = ''; return; }
+  box.innerHTML = '成品文件夹 <b>' + esc(dir) + '</b><br>' +
+    '文件名都是 <b>' + esc(base) + '</b>（.pdf / .pptx / .figlab）' +
+    '<br>后台自动保存不进桌面，只有点「导出」才会放进来。';
+  box.title = dir;
+}
+function showTip(e,p){
+  if(pdrag) return;
+  const t = $('tip');
+  const off = (Math.abs(p.off_x || 0) > 1e-9 || Math.abs(p.off_y || 0) > 1e-9)
+    ? '  （整条曲线已平移 Δ' + (p.off_x || 0).toFixed(2) + ', ' + (p.off_y || 0).toFixed(2) + '）'
+    : '';
+  t.textContent = p.letter + '  ' + p.curve + '  #' + p.point_index +
+    '  f=' + p.freq_Hz.toPrecision(5) + ' Hz  Z\'' + p.Zp_ohm.toFixed(2) +
+    '  -Z\'\'=' + p.Zpp_neg_ohm.toFixed(2) + ' Ω' + off;
+  t.style.display = 'block';
+  t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px';
+}
+function hideTip(){ if(!pdrag && !adrag) $('tip').style.display = 'none'; }
+function selectPoint(i){
+  S.selected = S.points[i];
+  document.querySelectorAll('.hot').forEach(h=>h.classList.remove('sel'));
+  const el = document.querySelector('.hot[data-i="' + i + '"]');
+  if(el) el.classList.add('sel');
+  fillPoint(S.selected);
+}
+function fillPoint(p){
+  const box = $('pointPanel'), form = $('pointForm');
+  if(!p){
+    box.innerHTML = '<div class="kv"><b>提示</b><span>点击图上任意数据点</span></div>';
+    form.style.display = 'none'; $('selBadge').textContent = '未选中'; return;
+  }
+  form.style.display = 'block';
+  $('selBadge').textContent = p.letter + ' #' + p.point_index;
+  box.innerHTML = '<div class="kv">' +
+    '<b>曲线</b><span>' + esc(p.curve) + '</span>' +
+    '<b>点序</b><span>' + esc(p.point_index) + '</span>' +
+    '<b>频率</b><span>' + p.freq_Hz.toPrecision(6) + ' Hz</span>' +
+    '<b>Z\' / Ω</b><span>' + p.Zp_ohm.toFixed(4) + '</span>' +
+    '<b>Z\'\' / Ω</b><span>' + p.Zpp_ohm.toFixed(4) + '</span>' +
+    '<b>-Z\'\' / Ω</b><span>' + p.Zpp_neg_ohm.toFixed(4) + '</span>' +
+    ((Math.abs(p.off_x || 0) > 1e-9 || Math.abs(p.off_y || 0) > 1e-9) ?
+      '<b>实测值</b><span>' + p.Zp_data.toFixed(4) + ' / ' + p.Zpp_data.toFixed(4) +
+      '（本曲线已平移）</span>' : '') +
+    '<b>颜色 / 符号</b><span>' + p.color + ' / ' + p.marker + '</span>' +
+    '<b>归一化坐标</b><span>' + p.nx.toFixed(4) + ', ' + p.ny.toFixed(4) + '</span>' +
+    '</div>';
+}
+
+/* ====================== 数据区：处理后 / 原始 ====================== */
+async function loadWorkbook(){
+  if(!S.fid) return null;
+  const d = await get('/api/workbook?figure=' + encodeURIComponent(S.fid));
+  if(d.error){ setStatus('工作台读取失败：' + d.error); return null; }
+  S.sheet.data = d;
+  if(!S.sheet.curve || !d.curves.some(c => c.curve === S.sheet.curve))
+    S.sheet.curve = d.curves.length ? d.curves[0].curve : null;
+  if(S.src === 'work'){ fillCurveSelect(); renderSheet(); }
+  updateUndoButtons();
+  return d;
+}
+async function loadRaw(){
+  if(!S.fid) return null;
+  const d = await get('/api/raw?figure=' + encodeURIComponent(S.fid));
+  if(d.error){ setStatus('原始快照读取失败：' + d.error); return null; }
+  S.sheet.raw = d;
+  if(S.src === 'raw'){ fillCurveSelect(); renderSheet(); }
+  return d;
+}
+function fillCurveSelect(){
+  const d = srcData(), sel = $('sheetCurve');
+  if(!d) return;
+  const list = d.curves || [];
+  if(!list.some(c => c.curve === S.sheet.curve))
+    S.sheet.curve = list.length ? list[0].curve : null;
+  sel.innerHTML = '';
+  list.forEach(c=>{
+    const o = document.createElement('option');
+    o.value = c.curve;
+    o.textContent = c.curve + '（' + (c.n_included != null ? c.n_included + '/' + c.n : c.n) + '）';
+    if(c.curve === S.sheet.curve) o.selected = true;
+    sel.appendChild(o);
+  });
+  const f = $('sheetField'), prev = f.value;
+  f.innerHTML = '';
+  cols().forEach(c => { const o=document.createElement('option'); o.value=c;
+                        o.textContent=c; f.appendChild(o); });
+  if(cols().indexOf(prev) >= 0) f.value = prev;
+}
+function sheetRows(){
+  const d = srcData();
+  return d ? d.rows.filter(r => r.curve === S.sheet.curve) : [];
+}
+function colRangeFields(){
+  const cs = cols();
+  const r = S.sheet.colRange;
+  if(!r) return null;
+  const a = cs.indexOf(r.c0), b = cs.indexOf(r.c1);
+  if(a < 0 || b < 0) return null;
+  return new Set(cs.slice(Math.min(a, b), Math.max(a, b) + 1));
+}
+function renderSheet(){
+  const d = srcData(), box = $('sheetBox');
+  if(!d){ box.innerHTML = ''; return; }
+  const raw = S.src === 'raw';
+  box.classList.toggle('readonly', raw);
+  const rows = sheetRows(), nums = cols();
+  const rf = colRangeFields();
+
+  let h = '<table><thead><tr><th class="rowno">行</th><th>点序</th>';
+  nums.forEach(c => h += '<th data-col="' + esc(c) + '">' + esc(c) + '</th>');
+  h += '<th>' + (raw ? '原始参与' : '参与') + '</th><th>' +
+       (raw ? '状态 / 原始备注' : '备注 / 理由') + '</th></tr></thead><tbody>';
+
+  rows.forEach((r,i)=>{
+    const idx = String(r.point_index), isSel = S.sheet.sel.has(idx);
+    const chg = r._changed || {};
+    const exc = String(r.include) === '0';
+    h += '<tr data-idx="' + esc(idx) + '" class="' +
+         (isSel ? 'selrow ' : '') + (exc && !raw ? 'excluded' : '') + '">' +
+         '<td class="rowno" data-rowno="' + esc(idx) + '">' + (i+1) + '</td>' +
+         '<td class="ro">' + esc(idx) + '</td>';
+    nums.forEach(c=>{
+      const isChg = c in chg;
+      const act = S.sheet.cell && S.sheet.cell.idx === idx && S.sheet.cell.field === c;
+      const inRange = isSel && rf && rf.has(c);
+      const tip = isChg ? ' title="当前工作值 ' + esc(chg[c]) + '"' : '';
+      h += '<td class="num' + (isChg ? ' chg' : '') + (act ? ' active' : '') +
+           (inRange ? ' selcell' : '') +
+           '" data-field="' + esc(c) + '" data-idx="' + esc(idx) + '"' + tip + '>' +
+           esc(r[c]) + '</td>';
+    });
+    if(raw){
+      h += '<td class="ro">' + esc(r.include) + '</td><td class="ro">';
+      if(Object.keys(chg).length)
+        h += '<span class="flag ch">改值 ' + Object.keys(chg).length + ' 处</span>';
+      if(r._flip && String(r._flip.to) === '0')
+        h += '<span class="flag ex">现被排除</span>';
+      h += esc(r.note || '') + '</td>';
+    }else{
+      h += '<td class="ro"><input type="checkbox" data-inc="' + esc(idx) +
+           '" style="width:auto" ' + (exc ? '' : 'checked') + '></td>';
+      const actN = S.sheet.cell && S.sheet.cell.idx === idx && S.sheet.cell.field === 'note';
+      h += '<td class="' + (actN ? 'active' : '') + '" data-field="note" data-idx="' +
+           esc(idx) + '">' + esc(r.note || '') + '</td>';
+    }
+    h += '</tr>';
+  });
+  box.innerHTML = h + '</tbody></table>';
+
+  box.querySelectorAll('td[data-field]').forEach(td=>{
+    td.onmousedown = e => cellDown(e, td);
+    td.ondblclick = () => startEdit(td);
+  });
+  box.querySelectorAll('input[data-inc]').forEach(cb=>{
+    cb.onchange = () => sheetInclude(cb.dataset.inc, cb.checked);
+  });
+  box.querySelectorAll('td[data-rowno]').forEach(td=>{
+    td.onmousedown = e => { e.preventDefault(); selectRow(td.dataset.rowno, e, true); };
+  });
+  box.querySelectorAll('th[data-col]').forEach(th=>{
+    th.title = '点一下选中整列对应的所有行';
+    th.onclick = () => {
+      const rs = sheetRows().map(r => String(r.point_index));
+      S.sheet.sel = new Set(rs);
+      S.sheet.anchor = rs[0] || null;
+      S.sheet.colRange = {c0: th.dataset.col, c1: th.dataset.col};
+      S.sheet.cell = rs.length ? {idx: rs[0], field: th.dataset.col} : null;
+      S.sheet.active = S.sheet.cell;
+      renderSheet();
+      setStatus('已选中 ' + rs.length + ' 行（整列 ' + th.dataset.col + '）');
+    };
+  });
+  renderFoot();
+
+  if(S.sheet.focus && !raw){
+    const f = S.sheet.focus; S.sheet.focus = null;
+    // 点序可能是 1.5 这类小数，不能用 CSS.escape 拼属性选择器，直接按 dataset 找
+    const td = Array.from(box.querySelectorAll('td[data-field]'))
+                    .find(x => x.dataset.idx === f.idx && x.dataset.field === f.field);
+    if(td){ td.scrollIntoView({block:'nearest'}); startEdit(td, f.initial); }
+  }
+}
+function renderFoot(){
+  const d = srcData(), rows = sheetRows();
+  if(!d){ $('sheetFoot').innerHTML = ''; return; }
+  if(S.src === 'raw'){
+    const df = d.diff || {};
+    $('sheetFoot').innerHTML =
+      '原始快照 <b>' + d.dataset + '</b> ｜ 本曲线 <b>' + rows.length + '</b> 行 ｜ 全表 <b>' +
+      d.n_rows + '</b> 行 ｜ 与工作副本相比：改值 <b>' + (df.value_changed || 0) +
+      '</b> 处 · 参与翻转 <b>' + (df.include_flipped || 0) + '</b> 处 · 新增 <b>' +
+      (df.rows_added || 0) + '</b> 行 · 丢失 <b>' + (df.rows_lost || 0) +
+      '</b> 行 ｜ <span style="color:var(--accent)">只读</span>';
+  }else{
+    $('sheetFoot').innerHTML =
+      '工作副本 <b>' + d.dataset + '</b> ｜ 本曲线 <b>' + rows.length +
+      '</b> 行 ｜ 全表 <b>' + d.n_rows + '</b> 行 ｜ 四类比对 <b>' +
+      JSON.stringify(d.diff) + '</b> ｜ 台账 <b>' + d.n_ledger +
+      '</b> 条 ｜ 历史 <b>' + (d.history_index + 1) + '/' + d.history_len + '</b>' +
+      (d.exclusions_without_reason && d.exclusions_without_reason.length ?
+        ' ｜ <span style="color:var(--warn)">无理由排除 ' +
+        d.exclusions_without_reason.length + ' 处（不合格）</span>' : '');
+  }
+}
+function setSrc(s){
+  S.src = s;
+  $('srcWork').classList.toggle('on', s === 'work');
+  $('srcRaw').classList.toggle('on', s === 'raw');
+  ['shInsert','shDelete','shExclude','shRestore','shFormula'].forEach(id=>{
+    $(id).disabled = (s === 'raw');
+  });
+  $('sheetReason').disabled = (s === 'raw');
+  $('fxbar').style.display = (s === 'raw') ? 'none' : '';
+  S.sheet.sel = new Set(); S.sheet.active = null; S.sheet.cell = null;
+  S.sheet.colRange = null; S.sheet.anchor = null;
+  fillCurveSelect(); renderSheet();
+  setStatus(s === 'raw' ? '原始快照：只读，橙色格是工作副本里被改过的值'
+                        : '工作副本：改动会写台账；先即时重绘，停手 1.2 s 自动导出核验');
+}
+function markActive(td){
+  $('sheetBox').querySelectorAll('td.active').forEach(x=>x.classList.remove('active'));
+  td.classList.add('active');
+}
+/* ---------- 选中：完全按 Excel 的习惯 ----------
+   单击单元格 = 选中这一行并激活该格；按住拖 = 刷一片；Shift = 连选；Ctrl = 挑着选；
+   行号点 = 整行；表头点 = 整列；Delete/Backspace = 直接删掉选中的行（可撤销）。
+   不再需要「先点行号、再点删除、再确认」这一套。 */
+function cellDown(e, td){
+  if(e.button !== 0) return;
+  e.preventDefault();
+  const idx = td.dataset.idx, field = td.dataset.field;
+  S.sheet.sheetFocus = true;
+  if(S.src === 'raw'){
+    S.sheet.cell = {idx:idx, field:field}; S.sheet.active = S.sheet.cell;
+    renderSheet(); return;
+  }
+  const rows = sheetRows().map(r => String(r.point_index));
+  if(e.shiftKey && S.sheet.anchor){
+    const a = rows.indexOf(S.sheet.anchor), b = rows.indexOf(idx);
+    S.sheet.sel = new Set(a >= 0 && b >= 0 ? rows.slice(Math.min(a,b), Math.max(a,b)+1) : [idx]);
+    const f0 = (S.sheet.cell && S.sheet.cell.field) || field;
+    S.sheet.colRange = {c0:f0, c1:field};
+  }else if(e.ctrlKey || e.metaKey){
+    if(S.sheet.sel.has(idx)) S.sheet.sel.delete(idx); else S.sheet.sel.add(idx);
+    S.sheet.anchor = idx;
+    S.sheet.colRange = null;
+  }else{
+    S.sheet.sel = new Set([idx]);
+    S.sheet.anchor = idx;
+    S.sheet.colRange = {c0:field, c1:field};
+  }
+  S.sheet.cell = {idx:idx, field:field}; S.sheet.active = S.sheet.cell;
+  S.sheet.drag = {idx:idx, field:field};
+  renderSheet();
+}
+function selectRow(idx, e, fromRowNo){
+  const rows = sheetRows().map(r => String(r.point_index));
+  S.sheet.sheetFocus = true;
+  if(e.shiftKey && S.sheet.anchor){
+    const a = rows.indexOf(S.sheet.anchor), b = rows.indexOf(idx);
+    S.sheet.sel = new Set(a >= 0 && b >= 0 ? rows.slice(Math.min(a,b), Math.max(a,b)+1) : [idx]);
+  } else if(e.ctrlKey || e.metaKey){
+    if(S.sheet.sel.has(idx)) S.sheet.sel.delete(idx); else S.sheet.sel.add(idx);
+    S.sheet.anchor = idx;
+  } else { S.sheet.sel = new Set([idx]); S.sheet.anchor = idx; }
+  S.sheet.colRange = null;
+  S.sheet.cell = {idx:idx, field:cols()[0] || 'note'};
+  S.sheet.active = S.sheet.cell;
+  renderSheet();
+}
+/* 拖动刷选：按住往下/往右拖，经过的单元格全选上（行集合 + 列范围） */
+function extendCellSel(e){
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if(!el) return;
+  const td = el.closest ? el.closest('td[data-field]') : null;
+  if(!td) return;
+  const idx = td.dataset.idx, field = td.dataset.field;
+  const rows = sheetRows().map(r => String(r.point_index));
+  const a = rows.indexOf(S.sheet.drag.idx), b = rows.indexOf(idx);
+  if(a < 0 || b < 0) return;
+  const next = rows.slice(Math.min(a,b), Math.max(a,b)+1);
+  const same = next.length === S.sheet.sel.size && next.every(x => S.sheet.sel.has(x))
+               && S.sheet.cell && S.sheet.cell.idx === idx && S.sheet.cell.field === field;
+  if(same) return;
+  S.sheet.sel = new Set(next);
+  S.sheet.colRange = {c0:S.sheet.drag.field, c1:field};
+  S.sheet.cell = {idx:idx, field:field}; S.sheet.active = S.sheet.cell;
+  renderSheet();
+}
+async function deleteSelectedRows(){
+  if(S.src === 'raw'){ setStatus('原始快照只读，不能删'); return; }
+  const idxs = Array.from(S.sheet.sel);
+  if(!idxs.length){ setStatus('先在表格里选中要删的行'); return; }
+  S.sheet.sel = new Set();
+  const d = await commitOps([{op:'delete', curve:S.sheet.curve, indices:idxs,
+                              reason:$('sheetReason').value.trim() || '表格选中删除'}],
+                            '表格删除 ' + idxs.length + ' 行');
+  if(d) setStatus('已删除 ' + idxs.length + ' 行（Ctrl+Z 可撤销）');
+}
+function copySelection(){
+  const rows = sheetRows().filter(r => S.sheet.sel.has(String(r.point_index)));
+  if(!rows.length) return;
+  const rf = colRangeFields();
+  const cs = (cols().concat(['note'])).filter(c => !rf || rf.has(c));
+  const txt = rows.map(r => cs.map(c => String(r[c] == null ? '' : r[c])).join('\t')).join('\n');
+  const done = () => setStatus('已复制 ' + rows.length + ' 行 × ' + cs.length + ' 列');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => {});
+  }else{
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); done();
+  }
+}
+function startEdit(td, initial){
+  if(S.src === 'raw'){ setStatus('原始快照只读；要改请切到「处理后」'); return; }
+  const field = td.dataset.field, idx = td.dataset.idx;
+  const rows = sheetRows(), r = rows.find(x => String(x.point_index) === idx);
+  if(!r) return;
+  const old = String(r[field] == null ? '' : r[field]);
+  S.sheet.cell = {idx:idx, field:field};
+  S.sheet.active = S.sheet.cell;
+  td.classList.add('active');
+  td.innerHTML = '<input class="celledit" value="' + esc(initial != null ? initial : old) + '">';
+  const inp = td.firstChild; inp.focus();
+  if(initial != null) inp.setSelectionRange(inp.value.length, inp.value.length);
+  else inp.select();
+  let done = false;
+  const finish = (save, next) => {
+    if(done) return; done = true;
+    const v = inp.value;
+    if(next) S.sheet.focus = next;
+    if(save && v !== old){
+      commitOps([{op:'cell', curve:S.sheet.curve, point_index:idx,
+                  field:field, value:v}], '单元格编辑 ' + field + ' #' + idx);
+    } else { renderSheet(); }
+  };
+  inp.onkeydown = e => {
+    if(e.key === 'Escape'){ e.preventDefault(); finish(false, null); }
+    else if(e.key === 'Enter'){
+      e.preventDefault();
+      const ri = rows.findIndex(x => String(x.point_index) === idx);
+      const nx = rows[ri + 1];
+      finish(true, nx ? {idx:String(nx.point_index), field:field} : null);
+    }
+    else if(e.key === 'Tab'){
+      e.preventDefault();
+      const cs = cols().concat(['note']);
+      const k = cs.indexOf(field), ri = rows.findIndex(x => String(x.point_index) === idx);
+      let nf = cs[Math.min(k+1, cs.length-1)], ni = idx;
+      if(k + 1 >= cs.length && ri + 1 < rows.length){
+        nf = cs[0]; ni = String(rows[ri+1].point_index);
+      }
+      finish(true, {idx:ni, field:nf});
+    }
+  };
+  inp.onblur = () => finish(true, null);
+}
+async function commitOps(ops, label){
+  if(S.src === 'raw'){ setStatus('原始快照只读，改动未提交'); return null; }
+  if(!ops.length){ setStatus('没有待提交的操作'); return null; }
+  markBusy(true);
+  setStatus(label + '…');
+  try{
+    const d = await post('/api/workbook', {figure:S.fid, ops:ops, label:label,
+                                           reason:label, fast:true});
+    if(d.error || !d.ok){
+      setStatus('操作被拒绝：' + (d.error || (d.problems||[]).join('；')));
+      await loadWorkbook(); return null;
+    }
+    await applyWorkbook(d);
+    scheduleExport();                  // 停手 1.2 s 后自动补齐 PDF 与核验
+    return d;
+  } finally { markBusy(false); }
+}
+async function sheetInclude(idx, checked){
+  if(S.src === 'raw'){ setStatus('原始快照只读'); await loadRaw(); return; }
+  const reason = $('sheetReason').value.trim();
+  if(!checked && !reason){
+    setStatus('不合格操作：排除必须写理由（填上方「理由」框），改动未提交');
+    await loadWorkbook(); return;
+  }
+  const idxs = (S.sheet.sel.size && S.sheet.sel.has(String(idx)))
+               ? Array.from(S.sheet.sel) : [idx];
+  const ops = idxs.map(i => ({op:'include', curve:S.sheet.curve, point_index:i,
+                              include:checked, reason:reason}));
+  await commitOps(ops, (checked ? '恢复 ' : '排除 ') + idxs.length + ' 个点');
+}
+
+/* ====================== 导出 / 归档 / 核验 ====================== */
+function showArchive(a){
+  const box = $('archiveBox');
+  if(!a){
+    const dir = S.figureDir || '';
+    box.innerHTML = dir
+      ? '成品都放这里：<b>' + esc(dir) + '</b>（PDF / PPT / .figlab 同一层）'
+      : '点「导出」后，成品会放进 桌面\\FigLab\\&lt;图名&gt;\\';
+    return;
+  }
+  const items = a.items || [];
+  const fmts = items.map(x => String(x.format || '').toUpperCase()).filter(Boolean);
+  box.innerHTML = (items.length ? '已放到 <b>' + esc(a.dir) + '</b><br>' +
+      items.length + ' 个文件' + (fmts.length ? '（' + fmts.join(' / ') + '）' : '')
+    : '') +
+    ((a.errors && a.errors.length) ?
+      '<br><span style="color:var(--warn)">' + esc(a.errors.join('；')) + '</span>' : '');
+}
+function applyVerify(d){
+  if(!d || !d.export_status){
+    $('verifyBox').innerHTML = '图上已更新 · <b>待导出</b>' +
+      '（停手 1.2 s 自动导出 PDF 并核验；也可以点下面按钮立刻做）';
+    return;
+  }
+  const okN = d.verify_checks ? Object.values(d.verify_checks).filter(Boolean).length : 0;
+  const allN = d.verify_checks ? Object.keys(d.verify_checks).length : 0;
+  $('verifyBox').innerHTML = '导出 <b>' + d.export_status + '</b> ｜ 核验 <b>' +
+    d.verify_status + '</b>（' + okN + '/' + allN + '）｜ ' +
+    d.n_curves + ' 曲线 / ' + d.n_points + ' 点' +
+    (d.verify_failures && d.verify_failures.length ?
+      '<br><span style="color:var(--warn)">' + d.verify_failures.join('、') + '</span>' : '');
+  if(d.base) $('expName').value = d.base;
+  if(d.diff) setStatus('导出 ' + d.export_status + '，核验 ' + d.verify_status +
+                       '（' + okN + '/' + allN + '），改动 ' + JSON.stringify(d.diff || {}));
+  if(d.handoff) showArchive(d.handoff);
+}
+async function applyWorkbook(d){
+  if(!d || d.error){ setStatus('失败：' + (d && d.error)); return; }
+  if(d.svg){
+    $('svgbox').innerHTML = d.svg; S.points = d.points || S.points;
+    S.range = d.effective_range || S.range;
+    if(d.spec) S.spec = d.spec;
+    if(d.annotations) S.annotations = d.annotations;
+    if(d.texts) S.texts = d.texts;
+    if(d.segments) S.segments = d.segments;
+    baseStageSize(); buildHot(); applyTransform();
+  }
+  if(d.workbook){ S.sheet.data = d.workbook; }
+  else { await loadWorkbook(); }
+  await loadRaw();
+  fillCurveSelect(); renderSheet(); updateUndoButtons();
+  fillCurves(); fillLayer(); applyVerify(d);
+}
+function updateUndoButtons(){
+  const d = S.sheet.data;
+  $('undoBtn').disabled = !d || !d.undo;
+  $('redoBtn').disabled = !d || !d.redo;
+}
+async function history(kind){
+  markBusy(true);
+  try{
+    const d = await post('/api/' + kind, {figure:S.fid, fast:true});
+    if(d.error){ setStatus((kind === 'undo' ? '撤销' : '重做') + '失败：' + d.error); return; }
+    await applyWorkbook(d);
+    scheduleExport();
+    setStatus((kind === 'undo' ? '已撤销 → ' : '已重做 → ') + (d.edit ? d.edit.label : '') +
+              '；改动 ' + JSON.stringify(d.diff || {}));
+  } finally { markBusy(false); }
+}
+async function loadThumbs(){
+  const d = await get('/api/thumbs?id=' + encodeURIComponent(S.fid));
+  const bar = $('thumbbar'); bar.innerHTML = '';
+  (d.files || []).forEach(f=>{
+    const img = document.createElement('img');
+    img.src = '/api/thumb?id=' + encodeURIComponent(S.fid) + '&file=' + encodeURIComponent(f) + '&t=' + Date.now();
+    img.title = f + '（点击看大图）';
+    img.onclick = () => window.open(img.src, '_blank');
+    bar.appendChild(img);
+  });
+  if(!(d.files || []).length)
+    bar.innerHTML = '<span class="hint">尚无导出图，点右栏「重新导出并核验」生成</span>';
+  const btn = document.createElement('button');
+  btn.className = 'mini'; btn.textContent = '输出目录'; btn.style.marginLeft = 'auto';
+  btn.onclick = () => openFolder('output');
+  bar.appendChild(btn);
+}
+/* 改动只走「快渲染」：约 30 ms 出 SVG，页面立刻跟手；
+   停手 1.2 s 再把 PDF、核验数字、桌面归档补齐。 */
+function scheduleExport(){
+  if(!S.fid || S.src === 'raw') return;
+  clearTimeout(expTimer);
+  expTimer = setTimeout(runExport, 1200);
+}
+async function runExport(){
+  if(!S.fid || S.src === 'raw' || expBusy) return;
+  // 正在拖线/拖点时不抢 CPU：拖动结束会自己再排一次导出
+  if(mdrag || pdrag || adrag){ clearTimeout(expTimer); expTimer = setTimeout(runExport, 900); return; }
+  expBusy = true; markBusy(true);
+  try{
+    // 把界面这一份规格整份带上：页面是散点，导出的就必须是散点。
+    // deliver=false：自动保存只写内部 outputs，桌面一个文件都不多。
+    const d = await post('/api/export', {figure:S.fid, spec:S.spec, deliver:false});
+    if(!d.ok){ setStatus('导出失败：' + (d.problems || [d.error || '']).join('；')); return; }
+    if(d.spec) S.spec = d.spec;
+    applyVerify(d);
+    fillExport(); fillCurves();
+    await loadThumbs();
+    setStatus('已导出并核验：' + d.export_status + ' / ' + d.verify_status +
+              '（' + d.base + '）');
+  } catch(e){
+    setStatus('导出中断：' + e);
+  } finally { expBusy = false; markBusy(false); }
+}
+async function doExport(){
+  const fmts = Array.from(document.querySelectorAll('.fmt')).filter(c=>c.checked).map(c=>c.value);
+  if(fmts.indexOf('pdf') < 0) fmts.unshift('pdf');
+  clearTimeout(expTimer);
+  markBusy(true);
+  setStatus('导出 ' + fmts.join(' / ') + '：照界面这一版渲染，放到桌面…');
+  try{
+    // 整份规格传上去（含刚切的散点/折线），后端不会再读磁盘上的旧值
+    const spec = JSON.parse(JSON.stringify(S.spec));
+    spec.export = Object.assign({}, spec.export, {formats:fmts});
+    const d = await post('/api/export', {figure:S.fid, spec:spec, deliver:true});
+    if(!d.ok){ setStatus('导出失败：' + (d.problems || [d.error || '']).join('；')); return; }
+    await applyRender(d);
+    fillCurves(); await loadThumbs();
+    const hp = d.handoff || {}, pf = d.project_file || {};
+    $('verifyBox').textContent = '导出 ' + d.export_status + ' · 核验 ' + d.verify_status +
+      '（' + d.base + '）';
+    setStatus('已放到桌面：' + (hp.dir || '') +
+              (pf.ok ? '　项目文件已保存' : '') +
+              (hp.errors && hp.errors.length ? '　注意：' + hp.errors.join('；') : ''));
+  } finally { markBusy(false); }
+}
+/* 保存项目：把规格 + 工作副本写成 .figlab，放同一个成品文件夹 */
+async function saveProject(){
+  markBusy(true); setStatus('保存项目…');
+  try{
+    const d = await post('/api/project/save', {figure:S.fid, spec:S.spec});
+    if(!d.ok){ setStatus('保存失败：' + (d.problems || [d.error || '']).join('；')); return; }
+    setStatus('项目已保存：' + d.path + '（之后点「打开项目」选它就能接着改）');
+  } finally { markBusy(false); }
+}
+/* 打开项目：浏览器选文件 → 内容交给后端恢复成一张新图 */
+async function openProjectFile(file){
+  const text = await file.text();
+  markBusy(true); setStatus('正在恢复项目：' + file.name + '…');
+  try{
+    const d = await post('/api/project/open', {text:text});
+    if(!d.ok){ setStatus('打开失败：' + (d.error || (d.problems || []).join('；'))); return; }
+    await loadFigure(d.id);
+    setStatus('已打开「' + file.name + '」→ 新图 ' + d.id +
+              '（' + d.n_rows + ' 行数据；原项目不受影响，可继续改）');
+  } finally { markBusy(false); }
+}
+async function applyName(){
+  const ex = {auto_name: $('expAuto').checked};
+  if(!ex.auto_name) ex.base = $('expName').value.trim() || '图';
+  await postSpec({export: ex});
+  setStatus(ex.auto_name ? '文件名改为按日期自动命名：' + ($('expName').value || '')
+                         : '文件名已固定为 ' + ex.base);
+}
+async function openFolder(which){
+  const d = await post('/api/open-folder', {figure:S.fid, which:which || 'archive'});
+  setStatus(d.ok ? '已打开 ' + d.path : '打开失败：' + d.error);
+}
+
+/* ====================== 曲线列表 / 版式 ====================== */
+async function fillCurves(){
+  const box = $('curveList'); box.innerHTML = '';
+  const wb = S.sheet.data;
+  const byCurve = {};
+  if(wb) (wb.curves || []).forEach(c => byCurve[c.curve] = c);
+  $('curveCount').textContent = '(' + S.spec.series.length + ')';
+  for(const s of S.spec.series){
+    const c = byCurve[s.curve] || {};
+    const drawn = S.points.filter(p=>p.curve === s.curve).length;
+    const row = document.createElement('div'); row.className = 'curve';
+    row.dataset.curve = s.curve;
+    // 线多的时候，从列表锁定最省事：点一行 → 之后框选只作用于这条线
+    row.onclick = ev => {
+      if(ev.target.closest('input,button')) return;        // 勾选框、「表」按钮不抢
+      clearTimeout(aimTimer);
+      aimTimer = setTimeout(() => {
+        const on = S.aim !== s.curve;
+        setAim(on ? s.curve : null);
+        setStatus(on ? '已选中 ' + s.curve + '：图上其它线淡出，框选只作用于它 · 再点一次取消'
+                     : '已取消选择：框选回到全部曲线');
+      }, 220);
+    };
+    row.innerHTML =
+      '<span class="swatch" style="background:' + s.color + '"></span>' +
+      '<span class="letter" style="color:' + s.color + '">' + s.letter + '</span>' +
+      '<span class="cname" title="' + esc(s.curve) + '（双击改显示名）">' +
+      esc(s.name || s.curve) + '</span>' +
+      '<span class="cnt">' + drawn + '点' +
+      ((S.segments && S.segments[s.curve] > 1)
+        ? ' <span class="segchip" title="剔除处已断开：这条曲线由 ' +
+          S.segments[s.curve] + ' 段线组成">' + S.segments[s.curve] + '段</span>' : '') +
+      '</span>';
+    const nm = row.querySelector('.cname');
+    nm.ondblclick = async ()=>{
+      clearTimeout(aimTimer);
+      const v = prompt('这条曲线在列表里显示的名字（不改数据里的曲线名）:', s.name || s.curve);
+      if(v === null) return;
+      const series = S.spec.series.map(x => Object.assign({}, x));
+      series.find(x => x.curve === s.curve).name = v.trim();
+      await postSpec({series});
+    };
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = s.include; cb.style.width = 'auto'; cb.title = '图上显隐';
+    cb.onchange = () => toggleCurve(s.letter, cb.checked);
+    const tb = document.createElement('button');
+    tb.className = 'mini'; tb.textContent = '表';
+    tb.onclick = () => { S.sheet.curve = s.curve; setSrc('work'); };
+    row.appendChild(cb); row.appendChild(tb);
+    const ox = parseFloat(s.off_x || 0), oy = parseFloat(s.off_y || 0);
+    if(Math.abs(ox) > 1e-9 || Math.abs(oy) > 1e-9){
+      const chip = document.createElement('span');
+      chip.className = 'ofs';
+      chip.title = '整条曲线的显示平移（数据未改）';
+      chip.textContent = 'Δ' + ox.toFixed(2) + ',' + oy.toFixed(2);
+      const rs = document.createElement('button');
+      rs.textContent = '↺'; rs.title = '把这条曲线移回原始位置';
+      rs.onclick = ev => { ev.stopPropagation();
+        pushCurveOffset(s.curve, 0, 0).then(()=>{ fillCurves(); scheduleExport(); }); };
+      chip.appendChild(rs); row.appendChild(chip);
+    }
+    box.appendChild(row);
+  }
+}
+async function toggleCurve(letter, on){
+  const series = S.spec.series.map(s => Object.assign({}, s, {include: s.letter === letter ? on : s.include}));
+  await postSpec({series});
+}
+function fillView(){
+  const s = S.spec, st = s.style, a = s.axis;
+  $('vPreset').value = s.preset;
+  $('vFont').value = st.font; $('vTick').value = st.tick_pt;
+  $('vTitle').value = st.title_pt; $('vMark').value = st.marker_size_pt;
+  $('vLine').value = st.line_width_pt;
+  $('vW').value = s.page.w_cm; $('vH').value = s.page.h_cm;
+  $('vX0').value = a.x_from == null ? '' : a.x_from;
+  $('vX1').value = a.x_to == null ? '' : a.x_to;
+  $('vY0').value = a.y_from == null ? '' : a.y_from;
+  $('vY1').value = a.y_to == null ? '' : a.y_to;
+  $('vTail').value = s.data.tail_ohm;
+  $('vFit').value = s.data.fit_arc ? '1' : '0';
+  $('vEqual').checked = !!st.equal_aspect;
+  $('vBreak').checked = st.break_gaps !== false;
+  paintConnect();
+}
+async function applyRender(d){
+  if(!d || !d.ok){ setStatus('失败：' + ((d && d.problems) || []).join('；')); return; }
+  if(d.spec) S.spec = d.spec;
+  if(d.svg) $('svgbox').innerHTML = d.svg;
+  if(d.points) S.points = d.points;
+  if(d.effective_range) S.range = d.effective_range;
+  if(d.annotations) S.annotations = d.annotations;
+  S.texts = d.texts || [];
+  if(d.segments) S.segments = d.segments;
+  if(d.line_vertices) S.lineVerts = d.line_vertices;
+  if(d.curve_gids) S.curveGids = d.curve_gids;
+  if(d.figure_dir) S.figureDir = d.figure_dir;
+  if(d.output_dir) S.outDir = d.output_dir;
+  baseStageSize(); buildHot(); applyTransform();
+  fillCurves(); fillView(); fillLayer(); fillExport(); paintAim(); applyVerify(d);
+}
+async function savePoint(action){
+  if(!S.selected){ setStatus('请先选中一个点'); return; }
+  const p = S.selected;
+  const b = {figure:S.fid, curve:p.curve, point_index:p.point_index,
+             action:action, reason:$('ptReason').value, fast:true};
+  if(action === 'value'){ b.field = $('ptField').value; b.value = $('ptValue').value; }
+  if(action === 'note'){ b.note = $('ptReason').value; }
+  if(action === 'exclude' && !b.reason.trim()){
+    setStatus('不合格操作：排除数据点必须写理由，理由会写进台账'); return;
+  }
+  markBusy(true);
+  try{
+    const d = await post('/api/point', b);
+    if(d.error || !d.ok){ setStatus('失败：' + (d.error || (d.problems||[]).join('；'))); return; }
+    S.selected = null; fillPoint(null);
+    await applyWorkbook(d);
+    scheduleExport();
+  } finally { markBusy(false); }
+}
+async function applyView(){
+  const patch = {
+    style:{font:$('vFont').value, tick_pt:num($('vTick').value),
+           title_pt:num($('vTitle').value), marker_size_pt:num($('vMark').value),
+           line_width_pt:num($('vLine').value),
+           equal_aspect:$('vEqual').checked,
+           break_gaps:$('vBreak').checked,
+           connect:$('vConnect').value,
+           fill_frame:!$('vEqual').checked},
+    page:{w_cm:num($('vW').value), h_cm:num($('vH').value)},
+    axis:{x_from:num($('vX0').value), x_to:num($('vX1').value),
+          y_from:num($('vY0').value), y_to:num($('vY1').value)},
+    data:{tail_ohm:num($('vTail').value), fit_arc:$('vFit').value === '1',
+          fit_disclaimer:$('vFit').value === '1' ?
+            '参考圆拟合弧（fit），非实测数据；由首弧实测点最小二乘算出' : ''}
+  };
+  const anyRange = [patch.axis.x_from,patch.axis.x_to,patch.axis.y_from,patch.axis.y_to]
+                     .some(v => v !== null);
+  patch.axis.auto_from_data = !anyRange;
+  const d = await post('/api/spec', {figure:S.fid, patch:patch});
+  if(!d.ok){ setStatus('规格校验失败：' + d.problems.join('；')); return; }
+  await applyRender(d);
+}
+
+/* ====================== 缩放 / 平移 / 拖点 / 拖拽角 ====================== */
+function zoomAt(cx, cy, factor){
+  const nz = Math.min(8, Math.max(0.15, S.zoom * factor));
+  const f = nz / S.zoom;
+  S.panX = cx - (cx - S.panX) * f;
+  S.panY = cy - (cy - S.panY) * f;
+  S.zoom = nz; applyTransform();
+}
+$('viewport').addEventListener('wheel', e=>{
+  e.preventDefault();
+  const r = $('viewport').getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1/1.12);
+},{passive:false});
+$('viewport').addEventListener('mousedown', e=>{
+  // 操作条上的点击不能被当成「拉框」：否则按下就清空选择，按钮等于白点
+  if(e.target.closest('#boxbar, #aimbar')) return;
+  S.click0 = {x:e.clientX, y:e.clientY};    // 选线的起点，mouseup 时判是不是单击
+  if(e.target.id === 'resizeHandle'){       // 右下角改画布尺寸，任何模式下都优先
+    resize = {x:e.clientX, y:e.clientY, w:$('stage').offsetWidth, h:$('stage').offsetHeight};
+    e.preventDefault(); e.stopPropagation(); return;
+  }
+  // 框选优先于其它手势：Shift+拖动是临时框选，按钮开着则是常驻框选
+  if(S.boxMode || (e.shiftKey && !S.moveMode && !S.layerMode)){
+    const vp = $('viewport').getBoundingClientRect();
+    clearBoxSel();
+    bdrag = {x0:e.clientX - vp.left, y0:e.clientY - vp.top,
+             x1:e.clientX - vp.left, y1:e.clientY - vp.top, one:!S.boxMode};
+    document.body.classList.add('boxsel');
+    clearTimeout(expTimer);              // 别让后台导出插进拉框里
+    drawMarquee();
+    e.preventDefault();
+    return;
+  }
+  if(e.target.closest('.hot') || e.target.closest('.ahot') ||
+     e.target.closest('.thot') || e.target.id === 'resizeHandle') return;
+  if(S.moveMode){
+    const n = normPx(e);
+    const hit = nearestCurve(n.nx, n.ny, n.w, n.h);
+    if(!hit){ setStatus('没点中曲线：按住某条线本身再拖（离点 16 px 以内算点中）'); return; }
+    const s = S.spec.series.find(x => x.curve === hit.curve) || {};
+    // 拖动期间的换算基准固定下来：否则轴范围随平移一起变，手会被"甩开"
+    mdrag = {curve:hit.curve, start:n,
+             off0:{x:parseFloat(s.off_x || 0), y:parseFloat(s.off_y || 0)},
+             range0:JSON.parse(JSON.stringify(S.range)),
+             layer0:JSON.parse(JSON.stringify(S.spec.layer)),
+             last:null, curveName:hit.curve};
+    e.preventDefault();
+    clearTimeout(expTimer);              // 别让后台导出插进拖动里
+    setStatus('正在平移曲线：' + hit.curve + '（只改显示位置）');
+    return;
+  }
+  drag = {x:e.clientX, y:e.clientY, px:S.panX, py:S.panY};
+  $('viewport').classList.add('dragging');
+});
+function normPx(e){
+  const r = $('stage').getBoundingClientRect();
+  return {nx:(e.clientX - r.left) / r.width, ny:(e.clientY - r.top) / r.height,
+          w:r.width, h:r.height};
+}
+function nearestCurve(nx, ny, w, h, tol){
+  // 除了顶点，也算相邻两点的中点：曲线中段被按到时，顶点可能还在十几像素外
+  const lim = (tol == null) ? 16 : tol;
+  let best = null, bd = 1e9;
+  const pts = S.points || [];
+  const test = (x, y, curve) => {
+    const d = Math.hypot((x - nx) * w, (y - ny) * h);
+    if(d < bd){ bd = d; best = curve; }
+  };
+  pts.forEach((p, i) => {
+    test(p.nx, p.ny, p.curve);
+    const q = pts[i + 1];
+    if(q && q.curve === p.curve) test((p.nx + q.nx) / 2, (p.ny + q.ny) / 2, p.curve);
+  });
+  return (best && bd <= lim) ? {curve:best, dist:bd} : null;
+}
+
+/* ====================== 连线画法：散点 / 折线 / 平滑，一键循环 ====================== */
+/* 只改"点怎么连"，一个数据点都不动：
+   散点=只画符号（文献里 Nyquist 常这样）；折线=实测点直连；平滑=过点插值（好看，中间点是算的） */
+const CONNECT_ORDER = ['scatter', 'segment', 'smooth'];
+const CONNECT_NAME  = {scatter:'散点', segment:'折线', smooth:'平滑'};
+const CONNECT_TIP = {
+  scatter: '散点：只画实测符号，不连线。点一下 → 折线',
+  segment: '折线：相邻实测点直连（默认）。点一下 → 平滑',
+  smooth : '平滑：过实测点的 PCHIP 插值，中间点是算出来的、不是实测。点一下 → 散点'
+};
+function connectNow(){
+  const st = (S.spec && S.spec.style) || {};
+  const m = st.connect || 'segment';
+  return CONNECT_ORDER.includes(m) ? m : 'segment';
+}
+/* 点一下按钮就立刻变文案（乐观更新），请求排队慢慢追服务端：
+   连点时只保留最后一次目标，不会出现"点了没反应"。 */
+let connBusy = false, connWant = null;
+function paintConnect(force){
+  const m = force || connWant || connectNow(), b = $('connectToggle');
+  if(b){ b.textContent = '连线 ' + CONNECT_NAME[m]; b.title = CONNECT_TIP[m];
+         b.classList.toggle('on', m !== 'segment'); }
+  if($('vConnect')) $('vConnect').value = m;
+}
+async function setConnect(mode){
+  if(!CONNECT_ORDER.includes(mode)) return;
+  if(!connBusy && connectNow() === mode){ paintConnect(); return; }
+  connWant = mode;
+  paintConnect(mode);
+  if(connBusy) return;              // 已经有一发在路上，回来后会补发最新的
+  connBusy = true;
+  try{
+    while(connWant){
+      const m = connWant; connWant = null;
+      const d = await postSpec({style:{connect:m}});
+      if(!d){ setStatus('切换画法失败：规格没通过校验'); break; }
+    }
+  } finally {
+    connBusy = false;
+    paintConnect();                 // 落回服务端的真实状态
+    const m = connectNow();
+    setStatus('连线画法：' + CONNECT_NAME[m] + '　' + CONNECT_TIP[m].split('。')[0]);
+  }
+}
+$('connectToggle').onclick = () => {
+  const i = CONNECT_ORDER.indexOf(connectNow());
+  setConnect(CONNECT_ORDER[(i + 1) % CONNECT_ORDER.length]);
+};
+$('vConnect').onchange = () => setConnect($('vConnect').value);
+
+/* ====================== 框选删点：拉一个框，框里的点全部选中 ====================== */
+function boxSet(on){
+  if(on && S.pickMode) pickSet(false);      // 选线 / 框选抢同一个点击，进一个就退另一个
+  S.boxMode = !!on;
+  document.body.classList.toggle('boxsel', S.boxMode);
+  $('boxToggle').classList.toggle('on', S.boxMode);
+  paintAim();                      // 进/出框选模式都要刷新淡化
+  if(!S.boxMode){ clearBoxSel(); setStatus('已退出框选模式'); }
+  else {
+    fillBoxCurves();
+    setStatus(S.aim
+      ? '框选模式（已选 ' + S.aim + '）：拉框只选这条线 · 单击空白处取消选择'
+      : '框选模式：拉框选点；线多时先单击某条线选中它，就只框这一条');
+  }
+}
+function drawMarquee(){
+  const el = $('marquee');
+  if(!bdrag){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.left = Math.min(bdrag.x0, bdrag.x1) + 'px';
+  el.style.top = Math.min(bdrag.y0, bdrag.y1) + 'px';
+  el.style.width = Math.abs(bdrag.x1 - bdrag.x0) + 'px';
+  el.style.height = Math.abs(bdrag.y1 - bdrag.y0) + 'px';
+}
+/* 框是屏幕像素，点是画布归一化坐标：都换算到 client 坐标再比，缩放/平移都不用管 */
+/* ===== 线太多时：先锁定一条线，框选就只选它的点 ===== */
+/* 三种锁定方式：① 框选模式下单击某条线；② 操作条下拉直接选；③ 左侧曲线列表点一行。
+   锁定后别的曲线在图上淡出（SVG 里靠 gid cv<N> 定位），下拉里还会标出每条线被框到几个点，
+   所以"框完发现框到 3 条线"时只要换个下拉选项，选择范围立刻重算，不用重新拉框。 */
+function aimList(){
+  const used = new Set((S.points || []).map(p => p.curve));
+  return ((S.spec && S.spec.series) || []).filter(x => x.include && used.has(x.curve));
+}
+function fillBoxCurves(per){
+  const sel = $('boxCurve'); if(!sel) return;
+  const list = aimList(); S.boxCurveList = list;
+  const ai = S.aim ? list.findIndex(x => x.curve === S.aim) : -1;
+  sel.innerHTML = '<option value="-1">全部曲线</option>' + list.map((x, i) => {
+    const n = (per && per[x.curve]) ? '（' + per[x.curve] + '）' : '';
+    return '<option value="' + i + '">' + esc(x.letter + ' · ' + (x.name || x.curve)) + n + '</option>';
+  }).join('');
+  sel.value = String(ai);
+  const cur = ai >= 0 ? list[ai] : null;
+  sel.style.color = cur ? cur.color : '';
+  sel.style.borderColor = cur ? cur.color : '';
+  sel.title = cur
+    ? '只框选：' + cur.curve + '（切回「全部曲线」解除锁定）'
+    : '框选作用于全部曲线；选一条就只框它（框选模式里单击某条线也可以）';
+}
+/* 选线：单击图上任意一条线就选中它。选中的线加粗、其它线淡出，左侧列表同步高亮。
+   ⚠ 这是**纯显示层**：只改 SVG 的 opacity / stroke-width，不写规格、不触发导出，
+     所以点来点去不会把图改坏，也不会在桌面多出文件。 */
+function paintAim(){
+  // 换了图/数据集以后旧的曲线名可能已经不在了：不清掉的话所有线都会被判成"非目标"、
+  // 整张图淡成一片（切图时踩过这个坑）
+  const has = c => !!(S.curveGids && Object.prototype.hasOwnProperty.call(S.curveGids, c));
+  if(S.aim && !has(S.aim)){ S.aim = null; S.aimFocus = null; S.aimPrevInc = null; }
+  if(S.hoverCurve && !has(S.hoverCurve)) S.hoverCurve = null;
+  const aim = S.aim, ai = has(aim) ? S.curveGids[aim] : null;
+  // 悬停预览只在选线模式里生效：平时鼠标扫过图不该一闪一闪
+  const hov = S.pickMode ? S.hoverCurve : null, hi = has(hov) ? S.curveGids[hov] : null;
+  document.querySelectorAll('#svgbox [id^="cv"]').forEach(g => {
+    const m = /^cv(\d+)-/.exec(g.id); if(!m) return;
+    const n = +m[1];
+    let op = '';
+    if(aim != null && n !== ai) op = (n === hi) ? '0.85' : '0.14';   // 已选中时，悬停的另一条留一点影
+    else if(aim == null && hi != null && n !== hi) op = '0.32';
+    g.style.opacity = op;
+    if(g.id.indexOf('-line-') >= 0){                                  // 只加粗线，符号不动
+      thickenLine(g, n === ai ? 1.9 : (n === hi ? 1.4 : 1));
+    }
+  });
+  document.querySelectorAll('#hotlayer .hot').forEach(el => {
+    const p = S.points[+el.dataset.i], c = p ? p.curve : null;
+    let op = '';
+    if(aim != null && c !== aim) op = (c === hov) ? '0.85' : '0.22';
+    else if(aim == null && hov != null && c !== hov) op = '0.4';
+    el.style.opacity = op;
+  });
+  document.querySelectorAll('#curveList .curve').forEach(r => {
+    r.classList.toggle('aim', aim != null && r.dataset.curve === aim);
+    r.classList.toggle('hover', hov != null && r.dataset.curve === hov);
+  });
+  document.body.classList.toggle('hasaim', aim != null || hov != null);
+  paintAimBar();
+}
+/* matplotlib 把 stroke-width 写在 path 的 style 里，得逐个 path 改；
+   原值存进 dataset.w0，取消选中时按原值还原（重渲染后是新的 DOM，自然回到默认）。
+   k 是倍数：1 = 原样，1.9 = 选中，1.4 = 悬停预览 */
+function thickenLine(g, k){
+  const f = (k === true) ? 1.9 : (k === false ? 1 : (k > 0 ? k : 1));
+  g.querySelectorAll('path').forEach(p => {
+    if(p.dataset.w0 == null){
+      p.dataset.w0 = p.style.strokeWidth || p.getAttribute('stroke-width') || '';
+    }
+    const w0 = parseFloat(p.dataset.w0);
+    if(!isFinite(w0) || w0 <= 0) return;
+    p.style.strokeWidth = (f === 1 ? w0 : w0 * f) + 'px';
+  });
+}
+function paintAimBar(){
+  const bar = $('aimbar'); if(!bar) return;
+  const s = S.aim ? (S.spec.series || []).find(x => x.curve === S.aim) : null;
+  if(!s){ bar.classList.remove('show'); return; }
+  const n = (S.points || []).filter(p => p.curve === S.aim).length;
+  $('aimSw').style.background = s.color;
+  $('aimName').textContent = s.letter + ' · ' + (s.name || s.curve);
+  $('aimName').title = S.aim;
+  $('aimCnt').textContent = n + ' 点';
+  $('aimFocus').textContent = S.aimFocus ? '恢复全部' : '只看这条';
+  bar.classList.add('show');
+}
+function setAim(curve){
+  S.aim = curve || null;
+  if(!S.aim){ S.aimFocus = null; S.aimPrevInc = null; }
+  paintAim();
+  if(S.lastBox) pickInBox(S.lastBox);     // 有现成的框就按新范围立刻重算
+  else fillBoxCurves();
+  if(S.aim){
+    const row = Array.prototype.slice.call(document.querySelectorAll('#curveList .curve'))
+      .find(r => r.dataset.curve === S.aim);
+    if(row) row.scrollIntoView({block:'nearest'});
+  }
+}
+/* ====================== 选线按钮：进模式 → 鼠标扫过就亮 → 点一下选中 ====================== */
+/* 平时直接点线也能选中，但线细的时候容易点空、也看不出自己要点到谁。
+   这个模式把容差放宽到 26 px，并且鼠标一靠近就把那条线提亮、旁边报出名字与点数，
+   点下去就选中；选完自动退出模式，回到正常的编辑状态。 */
+function pickSet(on){
+  const want = !!on;
+  // 先把同样抢鼠标的模式关掉，再进选线（顺序很重要：反过来的话关别人的动作会把选线又关掉）
+  if(want){
+    if(S.boxMode) boxSet(false);
+    if(S.moveMode) $('moveToggle').click();
+    if($('dragToggle').checked) $('dragToggle').click();
+  }
+  S.pickMode = want;
+  if(!S.pickMode) S.hoverCurve = null;
+  document.body.classList.toggle('pickmode', S.pickMode);
+  const b = $('aimToggle'); if(b) b.classList.toggle('on', S.pickMode);
+  if(!S.pickMode) $('tip').style.display = 'none';
+  paintAim();
+  setStatus(S.pickMode
+    ? '选线模式：鼠标移到线附近会亮起来，单击即选中 · Esc 退出'
+    : '已退出选线模式');
+}
+function pickHover(e){
+  let curve = null;
+  const hotEl = e.target.closest ? e.target.closest('.hot') : null;
+  if(hotEl){
+    const p = S.points[+hotEl.dataset.i];
+    curve = p ? p.curve : null;
+  }else{
+    const n = normPx(e);
+    const hit = nearestCurve(n.nx, n.ny, n.w, n.h, 26);   // 选线模式放宽容差，细线/空处边缘也好点
+    curve = hit ? hit.curve : null;
+  }
+  if(curve !== S.hoverCurve){ S.hoverCurve = curve; paintAim(); }
+  const t = $('tip');
+  if(!curve){ t.style.display = 'none'; return; }
+  const s = (S.spec.series || []).find(x => x.curve === curve) || {};
+  const n = (S.points || []).filter(p => p.curve === curve).length;
+  t.textContent = '单击选中「' + (s.letter ? s.letter + ' · ' : '') + (s.name || curve) + '」　' + n + ' 点';
+  t.style.display = 'block';
+  t.style.left = (e.clientX + 14) + 'px'; t.style.top = (e.clientY + 16) + 'px';
+}
+$('aimToggle').onclick = () => pickSet(!S.pickMode);
+$('aimBox').onclick = () => {
+  if(!S.aim) return;
+  if(S.pickMode) pickSet(false);
+  boxSet(true);        // 框选已经认 S.aim，开起来就只框这一条
+};
+$('aimClose').onclick = () => {
+  setAim(null);
+  if(S.lastBox) clearBoxSel();
+  setStatus('已取消选线');
+};
+$('aimSheet').onclick = () => {
+  if(!S.aim) return;
+  S.sheet.curve = S.aim; setSrc('work');
+  setStatus('已跳到「' + S.aim + '」的工作副本');
+};
+/* 只看这条：写 include 才符合"界面什么样导出就什么样"，所以是真写规格；
+   但会记住操作前的显隐快照，点「恢复全部」原样还原，不是一次性破坏。 */
+$('aimFocus').onclick = async () => {
+  if(!S.aim) return;
+  let series;
+  if(!S.aimFocus){
+    S.aimPrevInc = (S.spec.series || []).map(s => ({curve:s.curve, include:s.include}));
+    series = S.spec.series.map(s => Object.assign({}, s, {include: s.curve === S.aim}));
+    S.aimFocus = S.aim;
+  }else{
+    const prev = {};
+    (S.aimPrevInc || []).forEach(x => prev[x.curve] = x.include);
+    series = S.spec.series.map(s => Object.assign({}, s,
+      {include: prev.hasOwnProperty(s.curve) ? prev[s.curve] : s.include}));
+    S.aimFocus = null; S.aimPrevInc = null;
+  }
+  await postSpec({series});
+  setStatus(S.aimFocus
+    ? '只看「' + S.aim + '」：其它曲线已隐藏（点「恢复全部」原样还原）'
+    : '已恢复全部曲线的显隐');
+};
+$('boxCurve').onchange = () => {
+  const i = parseInt($('boxCurve').value, 10);
+  const c = (i >= 0 && S.boxCurveList[i]) ? S.boxCurveList[i].curve : null;
+  setAim(c);
+  setStatus(c ? '只框选：' + c + '（其他曲线已淡出）' : '框选回到全部曲线');
+};
+
+function pickInBox(b){
+  S.lastBox = b;
+  const vp = $('viewport').getBoundingClientRect();
+  const st = $('stage').getBoundingClientRect();
+  const x0 = vp.left + Math.min(b.x0, b.x1), x1 = vp.left + Math.max(b.x0, b.x1);
+  const y0 = vp.top + Math.min(b.y0, b.y1), y1 = vp.top + Math.max(b.y0, b.y1);
+  const picks = [];
+  (S.points || []).forEach((p, i) => {
+    if(S.aim && p.curve !== S.aim) return;      // 锁定了某条线：别的线一个都不框
+    const px = st.left + p.nx * st.width, py = st.top + p.ny * st.height;
+    if(px >= x0 && px <= x1 && py >= y0 && py <= y1) picks.push(i);
+  });
+  S.picked = picks;
+  const per = {};
+  picks.forEach(i => { const c = S.points[i].curve; per[c] = (per[c] || 0) + 1; });
+  document.querySelectorAll('#hotlayer .hot.pick').forEach(e => e.classList.remove('pick'));
+  picks.forEach(i => {
+    const el = document.querySelector('#hotlayer .hot[data-i="' + i + '"]');
+    if(el) el.classList.add('pick');
+  });
+  $('marquee').style.display = 'none';
+  if(!picks.length){
+    $('boxbar').classList.remove('show');
+    fillBoxCurves({});
+    setStatus(S.aim
+      ? '框里没有「' + S.aim + '」的点：换个位置再拉，或把下拉切回「全部曲线」'
+      : '框里没有数据点：换个位置再拉，或者先确认曲线没被隐藏');
+    return;
+  }
+  const names = Object.keys(per).sort((a,b) => per[b] - per[a]);
+  const detail = names.slice(0, 3).map(c => c + ' ' + per[c]).join(' · ') +
+                 (names.length > 3 ? ' 等 ' + names.length + ' 条' : '');
+  $('boxInfo').innerHTML = '<b>' + picks.length + '</b> 点';
+  $('boxInfo').title = '框到 ' + names.length + ' 条曲线：' + detail;
+  $('boxInfo').title = esc(detail);
+  $('boxbar').classList.add('show');
+  fillBoxCurves(per);
+  $('boxReason').blur();      // 焦点留在页面上，Delete 才是「删点」而不是删字
+  setStatus('已框选 ' + picks.length + ' 点' + (S.aim ? '（只框 ' + S.aim + '）' : '') +
+            '：Delete 剔除 · Shift+Delete 删行 · Esc 取消');
+}
+function clearBoxSel(){
+  S.picked = [];
+  document.querySelectorAll('#hotlayer .hot.pick').forEach(e => e.classList.remove('pick'));
+  $('marquee').style.display = 'none';
+  $('boxbar').classList.remove('show');
+  bdrag = null;
+}
+function segNote(d){
+  const seg = (d && d.segments) || {};
+  const split = Object.keys(seg).filter(c => seg[c] > 1);
+  return split.length
+    ? '（' + split.map(c => c + ' 现分 ' + seg[c] + ' 段，断点处不连线').join('；') + '）'
+    : '';
+}
+/* exclude = 只不画（数据保留，可恢复）；delete = 真删行（走撤销历史） */
+async function boxApply(mode){
+  const picks = S.picked || [];
+  if(!picks.length){ setStatus('先拉一个框选中点'); return; }
+  if(S.src === 'raw'){ setStatus('原始快照只读：切到「处理后」再删'); return; }
+  if(bdrag) return;                      // 还在拉框，别把半截选择提交了
+  const reason = ($('boxReason').value || '').trim() || '框选剔除';
+  const byCurve = {};
+  picks.forEach(i => {
+    const p = S.points[i];
+    (byCurve[p.curve] = byCurve[p.curve] || []).push(String(p.point_index));
+  });
+  let ops = [];
+  if(mode === 'delete'){
+    if(!confirm('从工作副本里彻底删掉这 ' + picks.length + ' 行？\n（进撤销历史，Ctrl+Z 可回来）')) return;
+    ops = Object.keys(byCurve).map(c => ({op:'delete', curve:c, indices:byCurve[c]}));
+  }else{
+    Object.keys(byCurve).forEach(c => byCurve[c].forEach(idx =>
+      ops.push({op:'include', curve:c, point_index:idx, include:false, reason:reason})));
+  }
+  const label = (mode === 'delete' ? '框选删行 ' : '框选剔除 ') + picks.length + ' 点' +
+                (mode === 'delete' ? '' : '（' + reason + '）');
+  // 顺手把工作表切到主曲线并选中这些行，删了什么一眼能对上
+  const main = Object.keys(byCurve).sort((a,b) => byCurve[b].length - byCurve[a].length)[0];
+  if(main){
+    S.sheet.curve = main;
+    S.sheet.sel = new Set(byCurve[main]);
+    S.sheet.colRange = null;
+  }
+  clearBoxSel();
+  const d = await commitOps(ops, label);
+  if(d) setStatus(label + ' → 已重绘' + segNote(d) + '；Ctrl+Z 可撤销');
+}
+let ofsFlight = false, ofsPending = null;
+async function pushCurveOffset(curve, dx, dy, lock){
+  if(ofsFlight){ ofsPending = {curve, dx, dy, lock}; return; }   // 上一帧还在路上就只记最新值
+  ofsFlight = true;
+  try{
+    const d = await post('/api/curve-shift', {figure:S.fid, curve:curve, dx:dx, dy:dy,
+                                              lock_axis:!!lock});
+    if(d.ok){
+      if(d.spec) S.spec = d.spec;
+      $('svgbox').innerHTML = d.svg;
+      S.points = d.points; S.range = d.effective_range;
+      S.annotations = d.annotations || [];
+      if(d.segments) S.segments = d.segments;
+      buildHot();
+    }else{
+      setStatus('平移失败：' + ((d.problems || [d.error || '']).join('；')));
+    }
+  } finally {
+    ofsFlight = false;
+    if(ofsPending){ const p = ofsPending; ofsPending = null;
+                    pushCurveOffset(p.curve, p.dx, p.dy, p.lock); }
+  }
+}
+function dataFromNorm(nx, ny){
+  const L = S.spec.layer, R = S.range;
+  return {x: R.x[0] + (nx - L.left/100) / (L.width/100) * (R.x[1] - R.x[0]),
+          y: R.y[0] + (1 - (ny - L.top/100) / (L.height/100)) * (R.y[1] - R.y[0])};
+}
+function onHotDown(e, i){
+  e.stopPropagation();              // 别让 viewport 当成"拖画布"
+  S.click0 = {x:e.clientX, y:e.clientY};   // 但要把起点记下，mouseup 才知道是"点了这个点 → 选这条线"
+  if(!$('dragToggle').checked) return;
+  e.preventDefault();
+  clearTimeout(expTimer);
+  selectPoint(i);
+  pdrag = {i:i, el:e.currentTarget, val:null};
+}
+window.addEventListener('mousemove', e=>{
+  /* 选线模式：鼠标在图区内移动就把最近的那条线提亮 + 报名字。
+     拖拽（平移/框选/移线/拖点）进行中一律让位，别跟正在拖的手抢。 */
+  if(S.pickMode && !bdrag && !mdrag && !adrag && !pdrag && !drag && !resize){
+    const r = $('viewport').getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right &&
+                   e.clientY >= r.top && e.clientY <= r.bottom &&
+                   !(e.target.closest && e.target.closest('#aimbar, #boxbar, #resizeHandle'));
+    if(inside) pickHover(e);
+    else if(S.hoverCurve){ S.hoverCurve = null; paintAim(); $('tip').style.display = 'none'; }
+  }
+  if(bdrag){
+    const vp = $('viewport').getBoundingClientRect();
+    bdrag.x1 = e.clientX - vp.left; bdrag.y1 = e.clientY - vp.top;
+    drawMarquee();
+  }
+  if(adrag){
+    const n = stageNorm(e);
+    adrag.el.style.left = (n.nx * 100) + '%'; adrag.el.style.top = (n.ny * 100) + '%';
+    adrag.last = n; adrag.moved = true;
+    const t = $('tip');
+    t.textContent = (adrag.kind === 'annot' ? '标注' : '文字') +
+      ' → 画布 ' + (n.nx * 100).toFixed(1) + '%, ' + (n.ny * 100).toFixed(1) + '%';
+    t.style.display = 'block';
+    t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px';
+    return;
+  }
+  if(drag){ S.panX = drag.px + e.clientX - drag.x; S.panY = drag.py + e.clientY - drag.y;
+            applyTransform(); }
+  if(mdrag){
+    const n = normPx(e);
+    const L = mdrag.layer0, R = mdrag.range0;
+    const dxPerN = (R.x[1] - R.x[0]) / (L.width / 100);
+    const dyPerN = (R.y[1] - R.y[0]) / (L.height / 100);
+    const dx = mdrag.off0.x + (n.nx - mdrag.start.nx) * dxPerN;
+    const dy = mdrag.off0.y - (n.ny - mdrag.start.ny) * dyPerN;
+    mdrag.last = {dx:Math.round(dx * 1000) / 1000, dy:Math.round(dy * 1000) / 1000};
+    pushCurveOffset(mdrag.curve, mdrag.last.dx, mdrag.last.dy, true);
+    const t = $('tip');
+    t.textContent = mdrag.curve + '  ΔZ\'=' + mdrag.last.dx.toFixed(2) +
+      ' Ω   Δ(-Z\'\')=' + mdrag.last.dy.toFixed(2) + ' Ω   松手保存';
+    t.style.display = 'block';
+    t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px';
+  }
+  if(resize){
+    const w = Math.max(200, resize.w + e.clientX - resize.x);
+    const h = Math.max(150, resize.h + e.clientY - resize.y);
+    $('stage').style.width = w + 'px'; $('stage').style.height = h + 'px';
+    $('svgbox').style.width = w + 'px'; $('svgbox').style.height = h + 'px';
+  }
+  if(splitDrag){
+    const r = $('figpane').parentElement.getBoundingClientRect();
+    const ratio = (e.clientY - r.top) / r.height;
+    setRatio(ratio);
+  }
+  if(pdrag){
+    const r = $('stage').getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
+    const v = dataFromNorm(nx, ny);
+    pdrag.val = v;
+    pdrag.el.style.left = (nx*100) + '%'; pdrag.el.style.top = (ny*100) + '%';
+    const p = S.points[pdrag.i], axis = $('dragAxis').value, t = $('tip');
+    t.textContent = p.letter + ' #' + p.point_index + '  →  Z\'=' + v.x.toFixed(3) +
+      ' Ω   -Z\'\'=' + v.y.toFixed(3) + ' Ω   （写入 ' + axis + ' 轴）';
+    t.style.display = 'block';
+    t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px';
+  }
+});
+window.addEventListener('mouseup', async e=>{
+  /* 选线：单击（没拖开）图上的一条线 → 选中它；再点同一条或点空白 → 取消。
+     框选 / 平移 / 图层模式各有自己的拖拽语义，这里一律不抢。
+     点在某条线的数据点上也算选这条线（那种点被热区盖住，得从 dataset.i 反查曲线）。
+     选线模式（点「选线」按钮进来）下容差放宽到 26 px、选中后自动退出模式。 */
+  const c0 = S.click0; S.click0 = null;
+  if(c0 && !bdrag && !mdrag && !adrag && !pdrag && !S.moveMode && !S.layerMode &&
+     e.detail <= 1 && Math.abs(e.clientX - c0.x) < 4 && Math.abs(e.clientY - c0.y) < 4 &&
+     !e.target.closest('#boxbar, #aimbar, #resizeHandle, .ahot, .thot')){
+    const wasPick = S.pickMode;
+    let pickCurve = null;
+    const hotEl = e.target.closest('.hot');
+    if(hotEl){
+      const p = S.points[+hotEl.dataset.i];
+      pickCurve = p ? p.curve : null;
+    }else{
+      const n = normPx(e);
+      const hit = nearestCurve(n.nx, n.ny, n.w, n.h, wasPick ? 26 : 16);
+      pickCurve = hit ? hit.curve : null;
+    }
+    if(pickCurve){
+      if(S.aim === pickCurve && !wasPick){
+        setAim(null);
+        setStatus('已取消选线');
+      }else{
+        setAim(pickCurve);
+        if(wasPick) pickSet(false);      // 选完就退出模式，接下来的拖动/框选照常
+        setStatus('已选中「' + pickCurve + '」：右上角可「只看这条 / 删点 / 表」· Esc 取消');
+      }
+    }else if(wasPick){
+      setStatus('这里没有线：把鼠标移到线上再点（选中条会出现在右上角）· Esc 退出选线');
+    }else if(S.aim){
+      setAim(null);
+      setStatus('已取消选线');
+    }
+  }
+  if(bdrag){
+    const b = bdrag; bdrag = null;
+    $('marquee').style.display = 'none';
+    if(b.one) document.body.classList.remove('boxsel');
+    if(Math.abs(b.x1 - b.x0) < 6 || Math.abs(b.y1 - b.y0) < 6){
+      // 没拖开 = 单击：框选模式下点某条线就锁定它（只框这条），点空白解除
+      if(S.boxMode && !b.one){
+        const vp = $('viewport').getBoundingClientRect();
+        const st = $('stage').getBoundingClientRect();
+        const hit = nearestCurve((vp.left + b.x0 - st.left) / st.width,
+                                 (vp.top + b.y0 - st.top) / st.height,
+                                 st.width, st.height);
+        if(hit){
+          setAim(hit.curve);
+          setStatus('已锁定 ' + hit.curve + '：现在拉框只选这条线的点（Esc 或下拉切「全部曲线」解除）');
+        }else if(S.aim){
+          setAim(null);
+          setStatus('已解除锁定：框选回到全部曲线');
+        }else if(!(S.picked || []).length){
+          setStatus('框太小（<6 px），当成误触忽略；要框选请按住拖出一块面积');
+        }
+        return;
+      }
+      if(!(S.picked || []).length) setStatus('框太小（<6 px），当成误触忽略；要框选请按住拖出一块面积');
+      return;
+    }
+    pickInBox(b);
+    return;
+  }
+  if(mdrag){
+    const m = mdrag; mdrag = null; hideTip();
+    if(m.last){
+      await pushCurveOffset(m.curve, m.last.dx, m.last.dy, false);
+      fillCurves();
+      scheduleExport();
+      setStatus('曲线「' + m.curve + '」已平移 ΔZ\'=' + m.last.dx.toFixed(2) +
+                ' Ω、Δ(-Z\'\')=' + m.last.dy.toFixed(2) +
+                ' Ω；数据未改，曲线列表里的 ↺ 可归零');
+    }
+    return;
+  }
+  if(adrag){
+    const a = adrag; adrag = null; a.el.classList.remove('dragging'); hideTip();
+    if(!a.last || !a.moved){ buildObjHot(); return; }
+    const W = S.spec.page.w_cm / 2.54 * 72, H = S.spec.page.h_cm / 2.54 * 72;
+    if(a.kind === 'annot'){
+      const an = S.annotations[a.i], L = S.spec.layer;
+      // 拖出图框会被核验判「标注越框」，落点直接夹在图框内（留 1% 余量）
+      const nx = Math.min((L.left + L.width) / 100 - 0.01, Math.max(L.left / 100, a.last.nx));
+      const ny = Math.min((L.top + L.height) / 100 - 0.01, Math.max(L.top / 100, a.last.ny));
+      await saveObj('annot', a.i, {
+        annot_dx_pt: Math.round((nx - an.point_nx) * W * 10) / 10,
+        annot_dy_pt: Math.round(-(ny - an.point_ny) * H * 10) / 10,
+        annot_locked: true
+      });
+      setStatus('标注已移动并锁定：' + an.curve);
+    }else{
+      await saveObj('text', a.i, {nx: Math.round(a.last.nx * 1000) / 1000,
+                                  ny: Math.round(a.last.ny * 1000) / 1000});
+      setStatus('文字位置已保存');
+    }
+    return;
+  }
+  if(drag){ drag = null; $('viewport').classList.remove('dragging'); }
+  if(splitDrag){ splitDrag = null; $('splitter').classList.remove('on'); }
+  if(resize){
+    const w = $('stage').offsetWidth / PX_PER_CM, h = $('stage').offsetHeight / PX_PER_CM;
+    resize = null;
+    const d = await post('/api/spec', {figure:S.fid,
+      patch:{page:{w_cm:Math.round(w*100)/100, h_cm:Math.round(h*100)/100}}});
+    if(d.ok) await applyRender(d); else setStatus('改尺寸失败：' + (d.problems||[]).join('；') + '（已复位）');
+  }
+  if(pdrag){
+    const {i, val} = pdrag; pdrag = null; hideTip();
+    const p = S.points[i], axis = $('dragAxis').value, ops = [];
+    if(val){
+      if(axis === 'X' || axis === 'XY')
+        ops.push({op:'cell', curve:p.curve, point_index:p.point_index,
+                  field:'Zp_ohm', value:val.x});
+      if(axis === 'Y' || axis === 'XY')
+        ops.push({op:'cell', curve:p.curve, point_index:p.point_index,
+                  field:'Zpp_ohm', value:-val.y});
+    }
+    if(ops.length) await commitOps(ops, '图上拖点 #' + p.point_index + '（' + axis + ' 轴）');
+    else buildHot();
+  }
+});
+$('resizeHandle').addEventListener('mousedown', e=>{
+  resize = {x:e.clientX, y:e.clientY, w:$('stage').offsetWidth, h:$('stage').offsetHeight};
+  e.preventDefault(); e.stopPropagation();
+});
+$('viewport').addEventListener('dblclick', ()=>{ fitView(); });
+document.querySelectorAll('[data-zoom]').forEach(b=>{
+  b.onclick = ()=>{
+    const vp = $('viewport');
+    zoomAt(vp.clientWidth/2, vp.clientHeight/2, b.dataset.zoom === 'in' ? 1.25 : 0.8);
+  };
+});
+$('reset').onclick = ()=>{ S.zoom=1; S.panX=0; S.panY=0; applyTransform(); };
+$('fit').onclick = fitView;
+
+/* ====================== 上下比例 / 侧栏 ====================== */
+function setRatio(r){
+  S.ratio = Math.min(0.85, Math.max(0.15, r));
+  $('figpane').style.flex = S.ratio + ' 1 0';
+  $('datapane').style.flex = (1 - S.ratio) + ' 1 0';
+  localStorage.setItem('figlab.ratio', String(S.ratio));
+}
+$('splitter').addEventListener('mousedown', e=>{
+  splitDrag = true; $('splitter').classList.add('on'); e.preventDefault();
+});
+$('splitter').addEventListener('dblclick', ()=> setRatio(0.6));
+$('ratioFig').onclick = ()=> setRatio(S.ratio + 0.12);
+$('ratioSheet').onclick = ()=> setRatio(S.ratio - 0.12);
+$('ratioDef').onclick = ()=> setRatio(0.6);
+function setSide(open){
+  $('side').classList.toggle('collapsed', !open);
+  $('toggleSide').textContent = open ? '⟩ 侧栏' : '⟨ 侧栏';
+  localStorage.setItem('figlab.side', open ? '1' : '0');
+}
+$('toggleSide').onclick = ()=> setSide($('side').classList.contains('collapsed'));
+function setProj(open){
+  $('proj').classList.toggle('collapsed', !open);
+  $('toggleProj').textContent = open ? '⟨ 项目' : '⟩ 项目';
+  localStorage.setItem('figlab.proj', open ? '1' : '0');
+}
+$('toggleProj').onclick = ()=> setProj($('proj').classList.contains('collapsed'));
+$('projNewFolder').onclick = ()=> projOp({op:'new-folder'});
+$('btnPptx').onclick = ()=> doPptx('new');
+$('btnPptxAppend').onclick = ()=> doPptx('append');
+
+/* ====================== 按钮 / 快捷键 ====================== */
+$('srcWork').onclick = ()=> setSrc('work');
+$('srcRaw').onclick = ()=> setSrc('raw');
+$('undoBtn').onclick = ()=> history('undo');
+$('redoBtn').onclick = ()=> history('redo');
+$('dragToggle').onchange = ()=>{
+  const on = $('dragToggle').checked;
+  document.body.classList.toggle('dragon', on);
+  if(on && S.pickMode) pickSet(false);
+  if(on && S.moveMode) $('moveToggle').click();   // 两种拖动互斥，免得抢鼠标
+  if(on && S.boxMode) boxSet(false);
+  setStatus(on ? '拖点模式：按住数据点拖动，松手写回并重导出核验' : '已退出拖点模式');
+};
+$('moveToggle').onclick = ()=>{
+  S.moveMode = !S.moveMode;
+  document.body.classList.toggle('moveline', S.moveMode);
+  $('moveToggle').classList.toggle('on', S.moveMode);
+  if(S.moveMode && S.pickMode) pickSet(false);
+  if(S.moveMode && $('dragToggle').checked) $('dragToggle').click();
+  if(S.moveMode && S.boxMode) boxSet(false);
+  setStatus(S.moveMode
+    ? '移线模式：按住任意曲线上下左右拖动，整条线跟着走（只改显示位置，数据不动）'
+    : '已退出移线模式');
+};
+$('boxToggle').onclick = ()=> boxSet(!S.boxMode);
+$('boxExclude').onclick = ()=> boxApply('exclude');
+$('boxDelete').onclick = ()=> boxApply('delete');
+$('boxCancel').onclick = ()=>{ clearBoxSel(); setStatus('已取消框选'); };
+$('boxReason').onkeydown = e=>{
+  if(e.key === 'Enter'){ e.preventDefault(); boxApply('exclude'); }
+  else if(e.key === 'Escape'){ e.preventDefault(); clearBoxSel(); }
+};
+$('sheetCurve').onchange = e=>{
+  S.sheet.curve = e.target.value; S.sheet.sel = new Set();
+  S.sheet.active = null; S.sheet.cell = null; S.sheet.colRange = null; S.sheet.anchor = null;
+  renderSheet();
+};
+$('shInsert').onclick = ()=>{
+  const rows = sheetRows(), a = S.sheet.active;
+  const after = a ? a.idx : (rows.length ? String(rows[rows.length-1].point_index) : null);
+  if(!after){ setStatus('该曲线没有行'); return; }
+  commitOps([{op:'insert', curve:S.sheet.curve, after:after}], '在 #' + after + ' 后插入一行');
+};
+$('shDelete').onclick = ()=> deleteSelectedRows();
+$('shExclude').onclick = ()=>{
+  const idxs = S.sheet.sel.size ? Array.from(S.sheet.sel)
+                                : (S.sheet.active ? [S.sheet.active.idx] : []);
+  if(!idxs.length){ setStatus('先选中行'); return; }
+  sheetInclude(idxs[0], false);
+};
+$('shRestore').onclick = ()=>{
+  const idxs = S.sheet.sel.size ? Array.from(S.sheet.sel)
+                                : (S.sheet.active ? [S.sheet.active.idx] : []);
+  if(!idxs.length){ setStatus('先选中行'); return; }
+  sheetInclude(idxs[0], true);
+};
+$('shFormula').onclick = ()=>{
+  const expr = $('sheetExpr').value.trim(), field = $('sheetField').value;
+  if(!expr){ setStatus('先写表达式，例如 x*1.05'); return; }
+  const op = {op:'formula', curve:S.sheet.curve, field:field, expr:expr};
+  if(S.sheet.sel.size) op.indices = Array.from(S.sheet.sel);
+  commitOps([op], '公式填充 ' + field + ' = ' + expr +
+            (op.indices ? '（' + op.indices.length + ' 行）' : '（整列）'));
+};
+$('shLocate').onclick = ()=>{
+  const a = S.sheet.active;
+  if(!a){ setStatus('请先在数据表中点一个单元格'); return; }
+  const i = S.points.findIndex(p => p.curve === S.sheet.curve &&
+                                    String(p.point_index) === String(a.idx));
+  if(i < 0){ setStatus('该行不在当前图上（被排除、超出截尾或曲线已隐藏）'); return; }
+  selectPoint(i);
+  const el = document.querySelector('.hot[data-i="' + i + '"]');
+  if(el) el.scrollIntoView({block:'center'});
+};
+$('btnLocate').onclick = async ()=>{
+  if(!S.selected){ setStatus('请先选中一个点'); return; }
+  S.sheet.curve = S.selected.curve;
+  S.sheet.sel = new Set([String(S.selected.point_index)]);
+  S.sheet.cell = {idx:String(S.selected.point_index), field:'Zp_ohm'};
+  S.sheet.active = S.sheet.cell;
+  S.sheet.anchor = String(S.selected.point_index);
+  S.sheet.colRange = null;
+  await setSrc('work');
+  const tr = $('sheetBox').querySelector('tr.selrow');
+  if(tr) tr.scrollIntoView({block:'center'});
+};
+document.addEventListener('paste', e=>{
+  if(S.src !== 'work') return;
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;   // 单元格内联编辑走浏览器默认
+  const txt = (e.clipboardData || window.clipboardData).getData('text/plain');
+  if(!txt || !S.sheet.active) return;
+  const lines = txt.replace(/\r/g,'').split('\n');
+  while(lines.length && lines[lines.length-1].trim() === '') lines.pop();
+  if(!lines.length) return;
+  e.preventDefault();
+  const matrix = lines.map(l=>l.split('\t'));
+  commitOps([{op:'paste', curve:S.sheet.curve, start_index:S.sheet.active.idx,
+              start_field:S.sheet.active.field, matrix:matrix}],
+            '粘贴 ' + matrix.length + '×' + matrix[0].length + ' 块');
+});
+/* 表格：拖动刷选 + Excel 式键盘（Delete 删行、Ctrl+C 复制、直接打字改格、方向键移动） */
+document.addEventListener('mousedown', e=>{
+  const inSheet = e.target.closest && e.target.closest('#sheetBox');
+  if(!inSheet){ S.sheet.sheetFocus = false; S.sheet.drag = null; }
+});
+let cellMoveT = 0, cellMoveEv = null;
+$('sheetBox').addEventListener('mousemove', e=>{
+  if(!S.sheet.drag) return;
+  cellMoveEv = e;
+  const now = performance.now();
+  if(now - cellMoveT < 50) return;      // 大表（几百行）时别每像素重建一次 DOM
+  cellMoveT = now; extendCellSel(cellMoveEv);
+});
+window.addEventListener('mouseup', ()=>{ S.sheet.drag = null; });
+function cellTd(idx, field){
+  return Array.from($('sheetBox').querySelectorAll('td[data-field]'))
+              .find(x => x.dataset.idx === idx && x.dataset.field === field);
+}
+function moveCell(dr, dc){
+  const rows = sheetRows().map(r => String(r.point_index));
+  const cs = cols().concat(['note']);
+  if(!S.sheet.cell) return;
+  const ri = rows.indexOf(S.sheet.cell.idx), ci = cs.indexOf(S.sheet.cell.field);
+  const ni = Math.min(rows.length - 1, Math.max(0, ri + dr));
+  const nc = Math.min(cs.length - 1, Math.max(0, ci + dc));
+  if(ni < 0 || nc < 0) return;
+  const idx = rows[ni], field = cs[nc];
+  S.sheet.cell = {idx:idx, field:field}; S.sheet.active = S.sheet.cell;
+  S.sheet.sel = new Set([idx]); S.sheet.anchor = idx;
+  S.sheet.colRange = {c0:field, c1:field};
+  renderSheet();
+  const td = cellTd(idx, field);
+  if(td) td.scrollIntoView({block:'nearest'});
+}
+window.addEventListener('keydown', e=>{
+  const tag = (e.target && e.target.tagName) || '';
+  const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  // 帮助弹层最优先：开着时 Esc 关掉、? 也能关；别的键照旧
+  const ho = $('helpOverlay');
+  if(ho && ho.classList.contains('show')){
+    if(e.key === 'Escape' || e.key === '?'){ e.preventDefault(); ho.classList.remove('show'); }
+    return;                                   // 弹层开着时不让快捷键穿透到图上
+  }
+  if(!inField && e.key === '?' && !e.ctrlKey && !e.altKey && !e.metaKey){
+    e.preventDefault(); $('helpOverlay').classList.add('show'); return;
+  }
+  // 框选结果优先于工作表键盘：刚拉完框按 Delete 就是删刚选的点
+  if(!inField && S.picked.length &&
+     (e.key === 'Delete' || e.key === 'Backspace')){
+    e.preventDefault(); boxApply(e.shiftKey ? 'delete' : 'exclude'); return;
+  }
+  // 框选模式下按 Esc：手上已经有选中的点就先清点，没有就直接退模式（别把人困在模式里）
+  if(!inField && e.key === 'Escape' && S.boxMode && !S.picked.length){
+    e.preventDefault(); boxSet(false); return;
+  }
+  if(!inField && e.key === 'Escape' && S.picked.length){
+    e.preventDefault(); clearBoxSel(); setStatus('已取消框选'); return;
+  }
+  if(!inField && e.key === 'Escape' && S.pickMode){
+    e.preventDefault(); pickSet(false); return;
+  }
+  if(!inField && e.key === 'Escape' && S.aim){
+    e.preventDefault(); setAim(null);
+    setStatus(S.boxMode ? '已解除锁定：框选回到全部曲线' : '已取消选线'); return;
+  }
+  if(!inField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
+    e.preventDefault(); history(e.shiftKey ? 'redo' : 'undo'); return;
+  }
+  if(!inField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+    e.preventDefault(); history('redo'); return;
+  }
+  if(inField || !S.sheet.sheetFocus || !S.sheet.cell) return;
+  const k = e.key;
+  if(k === 'Delete' || k === 'Backspace'){
+    e.preventDefault(); deleteSelectedRows(); return;
+  }
+  if((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'a'){
+    e.preventDefault();
+    const rs = sheetRows().map(r => String(r.point_index));
+    S.sheet.sel = new Set(rs);
+    S.sheet.colRange = null;
+    S.sheet.anchor = rs[0] || null;
+    renderSheet();
+    setStatus('已选中本曲线全部 ' + rs.length + ' 行');
+    return;
+  }
+  if((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'c'){
+    e.preventDefault(); copySelection(); return;
+  }
+  if(k.startsWith('Arrow')){
+    e.preventDefault();
+    if(k === 'ArrowDown') moveCell(1, 0);
+    else if(k === 'ArrowUp') moveCell(-1, 0);
+    else if(k === 'ArrowRight') moveCell(0, 1);
+    else moveCell(0, -1);
+    return;
+  }
+  if(!e.ctrlKey && !e.metaKey && !e.altKey && k.length === 1 && S.src === 'work'){
+    const td = cellTd(S.sheet.cell.idx, S.sheet.cell.field);
+    if(td){ e.preventDefault(); startEdit(td, k); }
+  }
+});
+$('btnVal').onclick = ()=>savePoint('value');
+$('btnNote').onclick = ()=>savePoint('note');
+$('btnEx').onclick = ()=>savePoint('exclude');
+$('btnRe').onclick = ()=>savePoint('restore');
+$('applyView').onclick = applyView;
+$('applyName').onclick = applyName;
+$('layerToggle').onclick = ()=>{
+  S.layerMode = !S.layerMode;
+  document.body.classList.toggle('layeron', S.layerMode);
+  $('layerToggle').classList.toggle('primary', S.layerMode);
+  if(S.layerMode && S.boxMode) boxSet(false);
+  setStatus(S.layerMode ? '图层模式：拖动标注改位置、双击改文字（松手即写入规格并重导出）'
+                        : '已退出图层模式');
+};
+$('applyAxis').onclick = ()=> postSpec({axis:{x_title:$('axTitleX').value.trim() || 'Z\' / Ω',
+                                              y_title:$('axTitleY').value.trim() || '-Z\'\' / Ω'}});
+$('addText').onclick = ()=>{
+  const texts = (S.texts || []).map(t => Object.assign({}, t));
+  texts.push({id:'t' + Date.now(), text:'双击改文字', nx:0.55, ny:0.9,
+              size_pt:S.spec.style.tick_pt, color:'#000000'});
+  postSpec({texts: texts}).then(()=>{
+    if(!S.layerMode) $('layerToggle').click();     // 新加的文字立刻可拖
+    setStatus('已加一个文字对象：拖动放位置，双击改文字');
+  });
+};
+$('btnExport').onclick = doExport;
+$('btnFolder').onclick = ()=>openFolder('figure');
+$('btnOutFolder').onclick = ()=>openFolder('output');
+$('btnSaveProj').onclick = saveProject;
+$('btnOpenProj').onclick = ()=>$('projFile').click();
+$('projFile').onchange = async ()=>{
+  const f = $('projFile').files && $('projFile').files[0];
+  $('projFile').value = '';
+  if(f) await openProjectFile(f);
+};
+$('addTab').onclick = async ()=>{
+  const id = prompt('新图 ID（字母、数字、下划线）：','fig_' + Date.now().toString().slice(-5));
+  if(!id) return;
+  const preset = prompt('预设：inhouse / generic / dark_outline','inhouse');
+  if(!preset) return;
+  const d = await post('/api/figure/add',
+                       {id:id, preset:preset, folder:P.sel || ''});
+  if(!d.ok){ setStatus('新建失败：' + d.error); return; }
+  if(d.project){ P.tree = d.project; renderProject(); }
+  await loadFigure(id);
+};
+$('delTab').onclick = async ()=>{
+  if(!S.fid || !confirm('删除图「' + S.fid + '」的规格？（数据集与导出件不动）')) return;
+  const d = await post('/api/figure/delete', {id:S.fid});
+  if(d.project){ P.tree = d.project; renderProject(); }
+  S.fid = (d.figures && d.figures.length) ? d.figures[0].id : null;
+  if(S.fid) await loadFigure(S.fid); else { await loadFigures(); setStatus('已无图页签'); }
+};
+
+/* ====================== 启动 ====================== */
+(async ()=>{
+  const r = parseFloat(localStorage.getItem('figlab.ratio'));
+  setRatio(isNaN(r) ? 0.6 : r);
+  setSide(localStorage.getItem('figlab.side') !== '0');
+  setProj(localStorage.getItem('figlab.proj') !== '0');
+  await loadProject();
+  await loadPptTargets();
+  await loadFigures();
+  const qs = new URLSearchParams(location.search);
+  // ?fig=<图ID>：PPT 里那张图的回链就指到这里，点一下回到同一张图的编辑现场
+  const want = qs.get('fig');
+  const pick = (want && S.figures.some(f => f.id === want)) ? want
+             : (S.figures.length ? S.figures[0].id : null);
+  if(pick) await loadFigure(pick);
+  else setStatus('尚无图页签，点「+ 新图」创建');
+  // ?src=raw 直达原始快照视图，方便对照与截图核对
+  if(qs.get('src') === 'raw') setSrc('raw');
+  if(qs.get('layer')) $('layerToggle').click();   // ?layer=1 直接进图层模式
+  if(qs.get('move')) $('moveToggle').click();     // ?move=1 直接进移线模式
+  if(qs.get('box')) boxSet(true);                 // ?box=1 直接进框选模式
+  if(qs.get('connect')) setConnect(qs.get('connect'));   // ?connect=smooth 直达某种画法
+  // 布局探针：?probe=1 时把关键高度写进 <html data-probe>，供无头浏览器读取
+  if(qs.get('probe')){
+    document.documentElement.dataset.probe = JSON.stringify({
+      vh: window.innerHeight, main: $('figpane').parentElement.parentElement.offsetHeight,
+      work: $('figpane').parentElement.offsetHeight,
+      fig: $('figpane').offsetHeight, vp: $('viewport').offsetHeight,
+      data: $('datapane').offsetHeight, sheet: $('sheetBox').offsetHeight,
+      head: document.querySelector('#datapane .panehead').offsetHeight,
+      fx: $('fxbar').offsetHeight, foot: $('sheetFoot').offsetHeight,
+      thumb: $('thumbbar').offsetHeight,
+      figFlex: getComputedStyle($('figpane')).flexGrow,
+      dataFlex: getComputedStyle($('datapane')).flexGrow,
+      projW: $('proj').offsetWidth,
+      projRows: document.querySelectorAll('#projTree .pjrow').length,
+      projFigs: document.querySelectorAll('#projTree .pjfig').length,
+      projFolders: (P.tree.folders || []).length,
+      hasPpt: !!$('btnPptx'),
+      hasMove: !!$('moveToggle'),
+      hasBox: !!$('boxToggle'), boxMode: !!S.boxMode, picked: (S.picked || []).length,
+      segs: S.segments || {},
+      connect: connectNow(), lineVerts: S.lineVerts || {},
+      // 图层/导出状态用属性看不出来（都是 JS property），直接读运行时值
+      expName: $('expName').value, expAuto: $('expAuto').checked,
+      fmts: Array.from(document.querySelectorAll('.fmt')).filter(c => c.checked).map(c => c.value),
+      nAnnot: document.querySelectorAll('.ahot').length,
+      nText: document.querySelectorAll('.thot').length,
+      objRows: document.querySelectorAll('.objrow').length,
+      axX: $('axTitleX').value, axY: $('axTitleY').value,
+      base: S.spec ? S.spec.export.base : null,
+      formats: S.spec ? S.spec.export.formats : null,
+      offsets: S.spec ? S.spec.series.filter(s => (s.off_x || s.off_y)).length : null,
+      selRows: S.sheet.sel ? S.sheet.sel.size : 0});
+  }
+})();
+</script>
+
+<!-- 帮助弹层：? 键或顶栏「?」按钮打开，Esc 关闭 -->
+<div id="helpOverlay">
+  <div id="helpCard">
+    <button id="helpClose" class="mini" title="关闭（Esc）">×</button>
+    <h2>figlab 操作说明</h2>
+    <div style="color:var(--muted)">三种鼠标模式（图层 / 拖点 / 移线 / 选线 / 框选）互斥：开一个会自动关掉另一个，不会抢鼠标。</div>
+    <h3>鼠标模式</h3>
+    <table>
+      <tr><th style="width:110px">按钮</th><th>作用</th></tr>
+      <tr><td>✎ 图层</td><td>直接拖动图上标注、双击改文字、右侧面板增删标注</td></tr>
+      <tr><td>拖点</td><td>按住数据点拖动改数值（改 X / Y / XY 可选），松手写回并重导出核验</td></tr>
+      <tr><td>⇄ 移线</td><td>按住任意曲线拖动 = 整条平移，只改显示位置，数据不动</td></tr>
+      <tr><td>◎ 选线</td><td>鼠标扫过哪条线就高亮哪条，单击即选中；选中后右上角可「只看这条 / 删点 / 表」</td></tr>
+      <tr><td>▭ 框选删点</td><td>拉框选中框内点，再「不画」或「删行」；配合选线可只框一条线</td></tr>
+      <tr><td>连线</td><td>散点 / 折线 / 平滑三种画法循环切换，数据不动</td></tr>
+    </table>
+    <h3>快捷键</h3>
+    <table>
+      <tr><th style="width:170px">键</th><th>作用</th></tr>
+      <tr><td><kbd>Esc</kbd></td><td>逐层退出：清框选的点 → 退出当前模式 → 取消选中 → 关帮助</td></tr>
+      <tr><td><kbd>?</kbd></td><td>打开 / 关闭本说明</td></tr>
+      <tr><td><kbd>Delete</kbd> / <kbd>⏎</kbd></td><td>把框选的点「不画」（数据保留，曲线断开）</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>把框选的行从工作副本里彻底删除</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>撤销 / 重做</td></tr>
+      <tr><td><kbd>Shift</kbd>+拖动</td><td>不开框选模式也能临时拉框</td></tr>
+      <tr><td>滚轮 / 拖动 / 双击</td><td>缩放 / 平移 / 复位视图</td></tr>
+    </table>
+    <h3>导出与项目</h3>
+    <table>
+      <tr><th style="width:170px">入口</th><th>说明</th></tr>
+      <tr><td>导出到桌面并核验</td><td>右侧导出面板：所见即所得，落 <b>桌面\FigLab\&lt;图名&gt;\</b>（pdf/pptx/figlab）</td></tr>
+      <tr><td>保存项目 / 打开项目</td><td>.figlab 单文件；打开恢复为新图，原文件不动</td></tr>
+      <tr><td>自动导出</td><td>停手 1.2 秒后台自动导出核验，只写 outputs\，不进桌面</td></tr>
+    </table>
+  </div>
+</div>
+<script>
+// ---- 帮助弹层（HTML 在主脚本之后，事件绑定放在这里） ----
+$('helpBtn').onclick = () => $('helpOverlay').classList.add('show');
+$('helpClose').onclick = () => $('helpOverlay').classList.remove('show');
+$('helpOverlay').addEventListener('mousedown', e=>{
+  if(e.target === $('helpOverlay')) $('helpOverlay').classList.remove('show');
+});
+</script>
+</body>
+</html>
