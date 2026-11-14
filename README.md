@@ -6,10 +6,14 @@ Python 实现，前端为本地网页，五层之间以文件为契约，**不�
 ## 快速开始（拿到就能跑）
 
 ```bash
-# 1) 装 Python 3.10+（建议 3.12），然后装依赖（一行）
+# 0) 克隆（或直接下载 zip 解压）
+git clone https://github.com/dexiangli/figlab.git
+cd figlab
+
+# 1) 装依赖（Python 3.10+，建议 3.12）
 pip install -r requirements.txt
 
-# 2) 启动（在本项目目录下）
+# 2) 启动
 python run.py 8778
 
 # 3) 浏览器打开 http://127.0.0.1:8778
@@ -916,3 +920,28 @@ Esc 语义不变（帮助层开着时优先关帮助，其余逐层退出的规�
 > 本项目是纯 Python 本地科研绘图平台，五层架构（数据/处理/规格/渲染/核验）以文件为契约。
 > 启动：`pip install -r requirements.txt && python run.py 8778`，浏览器开 127.0.0.1:8778。
 > 架构文档见 README 第一~十四章；改代码后跑 `tests/acceptance.py` 与各 `tests/layer*.py` 回归。
+
+---
+
+## 十八、开源与「让 AI 帮你部署」
+
+- 仓库：<https://github.com/dexiangli/figlab>　许可证：MIT（见 `LICENSE`）
+- 仓库自带一份示例阻抗数据集与两张示例图，克隆后启动即可看到完整工作台，不需要自己先准备数据。
+- 想换自己的数据：把仪器导出文件（CHI 的 csv/bin、或带表头的 txt）放进 `datasets\<数据集ID>\raw\sources\`，
+  在页面左侧项目管理器里新建图并选数据集即可；数据集 ID 建议形如 `eis_20261107`（名字里的日期会成为成品文件名前缀）。
+
+把下面这段整体丢给任意 AI 编程助手（豆包 / Codex / DeepSeek / Claude Code …），它就能自行完成部署：
+
+```text
+帮我部署这个项目：https://github.com/dexiangli/figlab
+
+要求：
+1. git clone 到本地，用 Python 3.10+ 建虚拟环境；
+2. pip install -r requirements.txt（如网络慢，用清华镜像 https://pypi.tuna.tsinghua.edu.cn/simple）；
+3. python run.py 8778 启动，浏览器打开 http://127.0.0.1:8778；
+4. 启动后确认左侧出现示例数据集 eis_20261107，并能打开示例图 eis_wide；
+5. 如果 8778 被占用，换一个端口（例如 8790）并告诉我实际地址。
+
+这是一个纯 Python 项目：无数据库、无前端构建、不需要 Node（Node 仅开发期跑 UI 测试）。
+代码结构见 README 第一章，五层分别是 data / process / spec / render / verify，web 层是本地 HTTP 服务。
+```
