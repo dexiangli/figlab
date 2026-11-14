@@ -3,7 +3,7 @@
     {
       "id": "eis_wide",
       "preset": "inhouse",
-      "spec": "D:\\WorkBuddyPlace\\figlab\\specs\\eis_wide.json",
+      "spec": "specs/eis_wide.json",
       "folder": "f_default",
       "title": "eis_wide",
       "order": 27
@@ -11,7 +11,7 @@
     {
       "id": "eis_main",
       "preset": "inhouse",
-      "spec": "D:\\WorkBuddyPlace\\figlab\\specs\\eis_main.json",
+      "spec": "specs/eis_main.json",
       "folder": "f_default",
       "title": "eis_main",
       "order": 3

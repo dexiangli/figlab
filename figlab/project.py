@@ -83,15 +83,17 @@ def ensure(fig_id: str, preset: str = "inhouse", title: str = "",
     """注册/更新一张图；已有条目的 folder、title 不被覆盖（重绘不该挪位置）。"""
     data = load()
     fig = _figure(data, fig_id)
+    # 规格文件路径存「相对项目根」，这样整个目录搬到别的机器 / 别人克隆后依然有效
+    rel_spec = os.path.join("specs", fig_id + ".json")
     if fig is None:
-        fig = {"id": fig_id, "preset": preset, "spec": paths.spec_file(fig_id),
+        fig = {"id": fig_id, "preset": preset, "spec": rel_spec,
                "folder": folder or data["folders"][0]["id"],
                "title": title or fig_id, "order": _next_order(data["figures"]),
                "created": datetime.now().isoformat(timespec="seconds")}
         data["figures"].append(fig)
     else:
         fig["preset"] = preset or fig.get("preset", "")
-        fig["spec"] = paths.spec_file(fig_id)
+        fig["spec"] = rel_spec
         # title 只在新建时给一次：用户改过的显示名不能被重绘刷掉
     save(data)
     return fig

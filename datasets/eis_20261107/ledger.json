@@ -68,5 +68,19 @@
       "outputs/eis_main/20261107阻抗作图3.pdf",
       "outputs/eis_main/20261107阻抗作图3.png"
     ]
+  },
+  {
+    "at": "2026-11-14T11:08:21",
+    "action": "export",
+    "reason": "导出投稿级图件并自检，状态=合格",
+    "figure": "eis_main",
+    "formats": [
+      "pdf",
+      "png"
+    ],
+    "files": [
+      "outputs/eis_main/20261107阻抗作图.pdf",
+      "outputs/eis_main/20261107阻抗作图.png"
+    ]
   }
 ]
