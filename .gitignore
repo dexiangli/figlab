@@ -12,3 +12,6 @@ tmp_layer4_eis_main.json
 # 编辑器
 .vscode/
 .idea/
+
+# 本机撤销历史（运行时数据，体积大且只对本机有意义）
+history/
