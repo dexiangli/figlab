@@ -69,7 +69,11 @@
 
 - 规格里的 `working_csv` / `export.dir` 一律**相对项目根**（`datasets/...`、`outputs/...`），
   用 `paths.portable()` 写、`paths.absolute()` 读。不要写死盘符，别人 clone 要能跑。
-- 桌面成品目录、用户手填的 PPT 路径是绝对路径，它们本来就在项目外。
+- 「项目根」在运行时可能是**数据根**：`FIGLAB_DATA_ROOT` 指到别处时，`datasets/`、`specs/`、
+  `outputs/`、`history/`、`figures.json` 都在那个目录，代码根只放代码与预设。别把数据写进
+  代码目录，也别假设两者是同一个目录。
+- 桌面成品目录、用户手填的 PPT 路径是绝对路径，它们本来就在项目外。成品才进桌面，
+  平台内部文件（规格、快照、工作副本、核验报告）不进桌面。
 - 数据来源记 `paths.display_source()` 的写法（`~/Desktop/...`），不写用户名。
 
 ## 5. 改完代码要自证
