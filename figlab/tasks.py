@@ -22,7 +22,7 @@ from datetime import datetime
 
 from . import paths
 
-DIR = os.path.join(paths.ROOT, "tasks")
+DIR = paths.TASKS
 LOG = os.path.join(DIR, "requests.jsonl")
 STATUSES = ("pending", "doing", "done", "rejected")
 LABEL = {"pending": "待处理", "doing": "处理中", "done": "已完成",

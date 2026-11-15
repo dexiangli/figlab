@@ -8,13 +8,34 @@ from __future__ import annotations
 
 import os
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ...\figlab
+# 「代码根」= 这份安装所在目录，永远跟着代码走（预设、静态页、测试都在这里）。
+CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ...\figlab
+
+# 「数据根」= datasets / specs / outputs / figures.json / history 住的地方。
+# 2026-11-15 起可由 FIGLAB_DATA_ROOT 指到别处：多套 FigLab（或一台机器上多人）
+# 共用同一份 datasets/specs/outputs，装在哪都读写同一处，不再各存一份互不可见。
+# 不设这个变量时行为与旧版完全一致（数据根=代码根）。
+DATA_ROOT_ENV = "FIGLAB_DATA_ROOT"
+
+
+def _resolve_root() -> str:
+    configured = os.environ.get(DATA_ROOT_ENV, "").strip()
+    if configured:
+        p = os.path.normpath(os.path.expanduser(configured))
+        if os.path.isdir(p):
+            return p
+    return CODE_ROOT
+
+
+ROOT = _resolve_root()
 DATASETS = os.path.join(ROOT, "datasets")
 SPECS = os.path.join(ROOT, "specs")
 OUTPUTS = os.path.join(ROOT, "outputs")
-TESTS = os.path.join(ROOT, "tests")
-PRESETS = os.path.join(ROOT, "figlab", "spec", "presets")
+TESTS = os.path.join(CODE_ROOT, "tests")
+PRESETS = os.path.join(CODE_ROOT, "figlab", "spec", "presets")
 FIGURES = os.path.join(ROOT, "figures.json")
+TASKS = os.path.join(CODE_ROOT, "tasks")
+HISTORY = os.path.join(ROOT, "history")
 
 
 def absolute(p: str) -> str:

@@ -28,7 +28,7 @@ from . import NUMERIC_COLUMNS, columns
 from .dataset import append_ledger, now, read_long, write_long
 from .diff import compare
 
-HISTORY_DIR = os.path.join(paths.ROOT, "history")
+HISTORY_DIR = paths.HISTORY
 MAX_HISTORY = 60
 
 # 只读字段：身份列不允许在表格里被直接改写，participation 必须走带理由的入口

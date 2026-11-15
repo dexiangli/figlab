@@ -132,14 +132,28 @@ def main():
                     "mpl %s；全局设 pdf/ps.fonttype=42=%s；AST 检出真实 savefig(pdf=...) 调用文件=%s" %
                     (matplotlib.__version__, "pdf.fonttype" in src, bad_calls),
                     "pdf.fonttype" in src and not bad_calls))
-    checks8.append(("2 导出目录必须绝对路径",
-                    "spec.export.dir isabs=%s；export_report=%s" %
-                    (os.path.isabs(spec["export"]["dir"]), exp["export_dir_absolute"]),
-                    os.path.isabs(spec["export"]["dir"]) and exp["export_dir_absolute"]))
-    checks8.append(("3 旧进程占端口导致改了没生效",
-                    "8777 空闲=%s（旧服务占用）；8778 空闲=%s；run.py 有 port_free 预检" %
-                    (port_free(8777), port_free(8778)),
-                    not port_free(8777)))
+    # 契约是「规格里存相对项目根的路径」，所以这里查的是「不许写绝对路径」，
+    # 而不是「必须是绝对路径」——后者是 11-13 那版的老口径，会让每次 clone 都 FAIL。
+    checks8.append(("2 导出目录按项目根相对书写",
+                    "spec.export.dir=%r；isabs=%s；解析后=%s" %
+                    (spec["export"]["dir"],
+                     os.path.isabs(spec["export"]["dir"]), outdir),
+                    (not os.path.isabs(spec["export"]["dir"])) and
+                    os.path.isabs(outdir) and os.path.isdir(outdir)))
+    # 端口那条原本硬编码「8777 必须被旧服务占用」，换台机器必然 FAIL。
+    # 真正要守的是「启动前探测端口、被占就退出」，所以查代码，不查此刻谁占着端口。
+    pre = ""
+    for rel in ("run.py", "figlab/web/server.py"):
+        try:
+            with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+                pre += fh.read()
+        except OSError:
+            pass
+    checks8.append(("3 端口被占时启动会被拦下",
+                    "run.py / server.py 含 port_free 预检=%s；此刻 8777 空闲=%s、"
+                    "8778 空闲=%s（仅供参考）" %
+                    ("port_free" in pre, port_free(8777), port_free(8778)),
+                    "port_free" in pre))
     mk = [s["marker"] for s in spec["series"]]
     checks8.append(("4 符号统一封闭实心形",
                     "符号集合=%s；全在白名单=%s；命中禁用表=%s" %

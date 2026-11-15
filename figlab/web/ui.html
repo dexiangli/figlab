@@ -588,6 +588,21 @@
     <p id="boardError" role="status"></p>
   </form>
 </dialog>
+<dialog id="delPicker" style="min-width:460px">
+  <form>
+    <strong id="delHeading">删除</strong>
+    <div id="delList" style="margin:8px 0;font-size:12px;line-height:1.7;max-width:460px;word-break:break-all"></div>
+    <label style="display:block;margin-top:6px;font-size:12px"><input type="radio" name="delMode" value="remove" checked style="width:auto;margin:0 6px 0 0;vertical-align:-1px"> 只从项目树移除</label>
+    <p style="margin:2px 0 10px 20px;font-size:12px;opacity:.75">规格文件删掉，数据集与已导出的文件留在盘上。</p>
+    <label style="display:block;font-size:12px"><input type="radio" name="delMode" value="purge" style="width:auto;margin:0 6px 0 0;vertical-align:-1px"> 连源文件一起删掉</label>
+    <p id="delPurgeHint" style="margin:2px 0 10px 20px;font-size:12px;opacity:.75"></p>
+    <p id="delError" role="status" style="font-size:12px;color:#c0392b"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" id="delCancel">取消</button>
+      <button type="button" id="delOk" style="width:auto">删除</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="fullText">
   <form method="dialog">
     <strong id="fullTextHeading">完整内容</strong>
@@ -803,9 +818,52 @@ function renameFolder(f){
   if(v === null) return;
   projOp({op:'rename-folder', id:f.id, name:v});
 }
+function fmtBytes(n){
+  const v = Math.max(0, n || 0);
+  if(v < 1024) return v + ' B';
+  if(v < 1024 * 1024) return (v / 1024).toFixed(1) + ' KB';
+  return (v / 1024 / 1024).toFixed(1) + ' MB';
+}
+/* 删除对话框：同一套界面服务「图」和「文件夹」，返回 'remove' / 'purge' / null。 */
+function askDelete(heading, items, purgeHint){
+  return new Promise(resolve=>{
+    const dlg = $('delPicker');
+    $('delHeading').textContent = heading;
+    $('delList').replaceChildren(...(items || []).map(t=>{
+      const row = document.createElement('div');
+      row.textContent = '· ' + t;
+      return row;
+    }));
+    $('delPurgeHint').textContent = purgeHint || '导出目录与独占的数据集会一并删除，不可恢复。';
+    $('delError').textContent = '';
+    const first = dlg.querySelector('input[name=delMode][value=remove]');
+    if(first) first.checked = true;
+    let settled = false;
+    const finish = v => { if(settled) return; settled = true; dlg.close(); resolve(v); };
+    $('delOk').onclick = ()=>{
+      const m = dlg.querySelector('input[name=delMode]:checked');
+      finish(m ? m.value : 'remove');
+    };
+    $('delCancel').onclick = ()=> finish(null);
+    dlg.oncancel = ev=>{ ev.preventDefault(); finish(null); };
+    dlg.showModal();
+  });
+}
 function deleteFolder(f){
-  if(!confirm('删除文件夹「' + f.name + '」？里面的图会退回第一个文件夹，不会丢。')) return;
-  projOp({op:'delete-folder', id:f.id});
+  const figs = figsIn(f.id);
+  askDelete('删除文件夹「' + f.name + '」？',
+            figs.map(fig => fig.title || fig.id).concat(figs.length ? [] : ['（空文件夹）']),
+            '只被这些图引用的数据集与它们的导出目录会一并删除，不可恢复；共用的数据保留。')
+  .then(mode=>{
+    if(!mode) return;
+    if(mode === 'remove'){ projOp({op:'delete-folder', id:f.id}); return; }
+    projOp({op:'delete-folder', id:f.id, purge:true, figures: figs.map(fig=>fig.id)})
+    .then(d=>{
+      const freed = (d && d.freed) || {};
+      setStatus('已删除文件夹，释放 ' + fmtBytes(freed.bytes) +
+                '，清掉 ' + ((freed.datasets||[]).length) + ' 个数据集');
+    });
+  });
 }
 function renameFigure(fig){
   const v = prompt('这张图在项目管理器里显示的名字（不改导出文件名）：', fig.title || fig.id);
@@ -1576,7 +1634,7 @@ async function loadThumbs(){
 }
 /* 改动只走「快渲染」：约 30 ms 出 SVG，页面立刻跟手；
    停手 1.2 s 再把 PDF、核验数字、桌面归档补齐。 */
-$('autoExport').checked = localStorage.getItem('figlab.autoExport') === '1';
+$('autoExport').checked = localStorage.getItem('figlab.autoExport') !== '0';
 $('autoExport').onchange = () => {
   localStorage.setItem('figlab.autoExport', $('autoExport').checked ? '1' : '0');
   clearTimeout(expTimer);
@@ -2815,12 +2873,25 @@ $('boardForm').onsubmit = async event => {
   finally { $('createFromPicker').disabled = false; }
 };
 $('delTab').onclick = async ()=>{
-  if(!S.fid || !confirm('删除图「' + S.fid + '」的规格？（数据集与导出件不动）')) return;
-  if($('boardFrame').dataset.figure === S.fid){
+  if(!S.fid) return;
+  const id = S.fid;
+  let plan = {};
+  try { plan = await get('/api/figure/delete-plan?id=' + encodeURIComponent(id)); } catch(e){}
+  const title = (S.spec && S.spec.title) || id;
+  const items = ['规格文件 specs/' + id + '.json'];
+  if(plan.export_dir) items.push('导出目录 ' + plan.export_dir);
+  if(plan.dataset) items.push('数据集 ' + plan.dataset + '（只有这张图在用）');
+  if(plan.dataset_shared) items.push('数据集 ' + plan.dataset_shared + '（还有别的图在用，会保留）');
+  const mode = await askDelete('删除图「' + title + '」？', items,
+    plan.dataset ? '会删掉导出目录与数据集 ' + plan.dataset + '，不可恢复。'
+                 : '没有这张图独占的数据集，只会删掉导出目录。');
+  if(!mode) return;
+  if($('boardFrame').dataset.figure === id){
     delete $('boardFrame').dataset.figure;
     $('boardFrame').removeAttribute('src');
   }
-  const d = await post('/api/figure/delete', {id:S.fid});
+  const d = await post('/api/figure/delete', {id: id, purge: mode === 'purge'});
+  if(d.error){ $('delError').textContent = d.error; setStatus('删除失败：' + d.error); return; }
   if(d.project){ P.tree = d.project; renderProject(); }
   S.fid = (d.figures && d.figures.length) ? d.figures[0].id : null;
   if(S.fid) await loadFigure(S.fid); else {
@@ -2829,6 +2900,11 @@ $('delTab').onclick = async ()=>{
     $('hotlayer').replaceChildren();
     document.body.classList.remove('board-open');
     await loadFigures(); setStatus('项目中暂无图');
+  }
+  if(mode === 'purge' && d.freed){
+    setStatus('已删除，释放 ' + fmtBytes(d.freed.bytes) +
+              ((d.freed.datasets||[]).length ? '，清掉数据集 ' + d.freed.datasets.join('、') : '') +
+              ((d.freed.kept||[]).length ? '；共用数据保留：' + d.freed.kept.join('、') : ''));
   }
 };
 

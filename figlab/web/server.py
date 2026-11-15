@@ -100,6 +100,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, api.pptx_list())
             if p == "/api/figure":
                 return self._send(200, api.get_figure(q.get("id", ["eis_main"])[0]))
+            if p == "/api/figure/delete-plan":
+                return self._send(200, api.delete_plan(q.get("id", [""])[0]))
             if p == "/api/table":
                 return self._send(200, api.table(q.get("figure", [""])[0],
                                                  q.get("curve", [""])[0]))
@@ -191,7 +193,8 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/pptx":
                 return self._send(200, api.export_pptx(body["figure"], body))
             if p == "/api/figure/delete":
-                return self._send(200, api.delete_figure(body["id"]))
+                return self._send(200, api.delete_figure(body["id"],
+                                                         bool(body.get("purge"))))
             if p == "/api/verify":
                 return self._send(200, api.reports(body["figure"]))
             if p == "/api/open-folder":

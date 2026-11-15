@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import copy
+import glob
 import json
 import os
 import re
+import shutil
 
 from .. import handoff, paths, project, pptx_out
 from ..archive import archive_index          # 只读旧归档列表，写入路径已停用
@@ -78,6 +80,16 @@ def get_figure(fig_id: str) -> dict:
     return out
 
 
+def _auto_deliver() -> bool:
+    """自动导出时是否也把成品同步到桌面\\FigLab。
+
+    默认关闭（桌面不该因为改一个点就多出一堆文件）。设了
+    FIGLAB_AUTO_DELIVER=1 之后，每次保存/自动导出都会把 pdf/.figlab
+    一并写进桌面成品文件夹，适合「不想手动点导出」的日常使用。
+    """
+    return os.environ.get("FIGLAB_AUTO_DELIVER", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def re_render(fig_id: str, full: bool = True, lock_axis: bool = False,
               spec: dict | None = None, deliver: bool = False) -> dict:
     """改动后重新渲染。
@@ -129,7 +141,7 @@ def re_render(fig_id: str, full: bool = True, lock_axis: bool = False,
                 "verify_checks": vr["checks"], "verify_failures": vr["failures"],
                 "n_points": len(built["points_norm"]),
                 "n_curves": len(built["plotted"])})
-    if deliver:
+    if deliver or _auto_deliver():
         # 桌面只放成品：PDF/EPS/SVG/PNG 直接躺在「图名」文件夹里
         out["handoff"] = handoff.deliver(spec, rep)
         out["project_file"] = handoff.save_project(fig_id, spec)
@@ -160,12 +172,117 @@ def add_figure(fig_id: str, preset: str = "inhouse",
             "project": project.snapshot()}
 
 
-def delete_figure(fig_id: str) -> dict:
+def _force_rmtree(path: str) -> int:
+    """删掉整个目录并返回释放的字节数。
+
+    原始快照（datasets/<id>/raw/sources）是只读的，直接 rmtree 会抛
+    PermissionError，所以先把每个文件的只读位清掉再删。删不掉也不抛异常：
+    调用方只看「还在不在」，不能因为一个文件被占用就把整张图删一半。
+    """
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        for name in filenames:
+            fp = os.path.join(dirpath, name)
+            try:
+                total += os.path.getsize(fp)
+            except OSError:
+                pass
+            try:
+                os.chmod(fp, 0o666)
+            except OSError:
+                pass
+    shutil.rmtree(path, ignore_errors=True)
+    return total
+
+
+def _datasets_in_use(except_ids: set[str] | None = None) -> set[str]:
+    """还有哪些数据集被别的图引用着；删图时要靠它判断能不能连带删数据。"""
+    skip = except_ids or set()
+    used: set[str] = set()
+    for p in glob.glob(os.path.join(paths.SPECS, "*.json")):
+        fid = os.path.basename(p)[:-5]
+        if fid in skip:
+            continue
+        try:
+            with open(p, encoding="utf-8") as fh:
+                spec = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        ds = (spec.get("data") or {}).get("dataset")
+        if ds:
+            used.add(ds)
+    return used
+
+
+def _figure_files(fig_id: str) -> dict:
+    """一张图背后占着哪些磁盘文件：导出目录、数据集、台账。只算不删。"""
+    spec = None
+    if os.path.isfile(paths.spec_file(fig_id)):
+        try:
+            spec = load_spec(fig_id)
+        except Exception:                      # 规格坏了也要能删
+            spec = None
+    outdir = ""
+    if spec:
+        try:
+            outdir = paths.absolute((spec.get("export") or {}).get("dir") or "")
+        except (KeyError, ValueError):
+            outdir = ""
+    if not outdir:
+        outdir = os.path.join(paths.OUTPUTS, fig_id)
+    inside = os.path.abspath(outdir).startswith(os.path.abspath(paths.OUTPUTS) + os.sep)
+    ds = ((spec or {}).get("data") or {}).get("dataset") or ""
+    shared = bool(ds) and ds in _datasets_in_use({fig_id})
+    return {
+        "export_dir": outdir if (inside and os.path.isdir(outdir)) else "",
+        "dataset": "" if (not ds or shared) else ds,
+        "dataset_shared": ds if shared else "",
+        "history": os.path.join(paths.HISTORY, ds + ".json") if ds else "",
+    }
+
+
+def delete_plan(fig_id: str) -> dict:
+    """删除前给页面看的清单：哪些文件会跟着没，哪些因为是共用数据要留下。"""
+    if not os.path.isfile(paths.spec_file(fig_id)):
+        return {"ok": False, "error": "没有这张图"}
+    plan = _figure_files(fig_id)
+    return {"ok": True, "id": fig_id, **plan,
+            "exists": {
+                "export_dir": bool(plan["export_dir"]),
+                "dataset": bool(plan["dataset"]),
+                "history": bool(plan["history"] and os.path.isfile(plan["history"])),
+            }}
+
+
+def delete_figure(fig_id: str, purge: bool = False) -> dict:
+    """从项目树移除一张图。
+
+    purge=False（默认）：只摘条目与规格文件，数据集和导出件原样留在盘上。
+    purge=True：再把这张图独占的导出目录、数据集、台账一并删掉；数据集若还被
+    别的图引用，则保留数据，只删这张图自己的东西（清单见 delete_plan）。
+    """
+    plan = _figure_files(fig_id) if purge else {}
     remove_figure(fig_id)
     p = paths.spec_file(fig_id)
     if os.path.isfile(p):
         os.remove(p)
-    return {"ok": True, "figures": figure_list(), "project": project.snapshot()}
+    freed = {"bytes": 0, "dirs": [], "datasets": [], "kept": []}
+    if purge:
+        if plan.get("export_dir"):
+            freed["bytes"] += _force_rmtree(plan["export_dir"])
+            freed["dirs"].append(plan["export_dir"])
+        if plan.get("dataset"):
+            ddir = os.path.join(paths.DATASETS, plan["dataset"])
+            if os.path.isdir(ddir):
+                freed["bytes"] += _force_rmtree(ddir)
+                freed["datasets"].append(plan["dataset"])
+        if plan.get("dataset_shared"):
+            freed["kept"].append(plan["dataset_shared"])
+        if plan.get("history") and os.path.isfile(plan["history"]) and not plan.get("dataset_shared"):
+            freed["bytes"] += os.path.getsize(plan["history"])
+            os.remove(plan["history"])
+    return {"ok": True, "purged": bool(purge), "freed": freed,
+            "figures": figure_list(), "project": project.snapshot()}
 
 
 # ------------------------------------------------------------------ 项目管理器
@@ -184,12 +301,21 @@ def project_op(body: dict) -> dict:
         out = project.toggle_folder(body["id"])
     elif op == "delete-folder":
         out = project.delete_folder(body["id"])
+        if body.get("purge"):
+            freed = {"bytes": 0, "datasets": [], "figures": []}
+            for fig_id in body.get("figures") or []:
+                r = delete_figure(fig_id, purge=True)
+                if r.get("purged"):
+                    freed["bytes"] += r["freed"]["bytes"]
+                    freed["datasets"] += r["freed"]["datasets"]
+                    freed["figures"].append(fig_id)
+            out["freed"] = freed
     elif op == "move-figure":
         out = project.move_figure(body["id"], body["folder"])
     elif op == "rename-figure":
         out = project.rename_figure(body["id"], body.get("title", ""))
     elif op == "delete-figure":
-        return delete_figure(body["id"])
+        return delete_figure(body["id"], purge=bool(body.get("purge")))
     else:
         return {"ok": False, "error": "未知操作 %r" % op}
     out["project"] = project.snapshot()
