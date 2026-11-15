@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FigLab · 组图工作台</title>
+<link rel="stylesheet" href="/theme.css">
+<script src="/theme.js"></script>
+<style>
+  :root{font:13px/1.5 'Segoe UI','Microsoft YaHei',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+  *{box-sizing:border-box} body{margin:0} button,input,select,textarea{font:inherit;color:inherit}
+  button,a,input,select,textarea{outline-offset:3px} button{cursor:pointer} button:disabled{cursor:default;opacity:.55}
+  button,input,select,textarea{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:.45em .65em}
+  button:hover:enabled{border-color:var(--accent)} button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  button.primary:hover:enabled{background:var(--accent)} a{color:var(--accent)}
+  header{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.4rem;background:var(--panel);border-bottom:1px solid var(--line)}
+  header strong{font-size:1.2rem} header strong{margin-right:auto} .tools{display:flex;gap:.5rem;flex-wrap:wrap}
+  #boardName,#panelTitle,#sourceTitle{min-width:0;overflow-wrap:anywhere}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 12px 320px;min-height:calc(100vh - 76px)}
+  main.collapsed{grid-template-columns:minmax(0,1fr) 12px}
+  .desk{min-width:0;padding:clamp(16px,4vw,55px)} aside{padding:20px;background:var(--panel)}
+  #propertiesDivider{position:relative;z-index:2;background:var(--bg)}
+  #propertiesDivider::before{content:'';position:absolute;top:0;bottom:0;left:50%;border-left:1px solid var(--line)}
+  #toggleProperties{position:sticky;top:calc(50vh - 21px);margin-left:-2px;width:16px;height:42px;padding:0}
+  section+section{border-top:1px solid var(--line);margin-top:20px;padding-top:16px} h2{font-size:1rem;margin:0 0 .65rem}
+  p{margin:.45rem 0 .75rem} .note{font-size:.88rem;color:var(--muted)} .row{display:flex;gap:8px;align-items:center;margin:.5rem 0}
+  .row select{min-width:0;flex:1} input[type=number]{width:100%} input[type=file]{width:100%;margin:.4rem 0}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px} label{display:block}
+  label input, label select, textarea{display:block;width:100%;margin-top:.2rem} textarea{resize:vertical}
+  #canvas{position:relative;max-width:100%;margin:auto;background:#fff;box-shadow:0 8px 30px #18352f20;overflow:hidden}
+  #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#56716a;pointer-events:none}
+  .panel{color:#455465;position:absolute;display:grid;place-items:center;outline:1px dashed #a4b7af;touch-action:none;cursor:move}
+  .panel.selected{outline:2px solid var(--accent);z-index:1}.panel img{width:100%;height:100%;object-fit:contain;position:absolute;pointer-events:none}
+  .letter{position:absolute;left:2%;top:1%;font-size:clamp(11px,1.8vw,26px);font-weight:700;color:#111;background:#fff}
+  .handle{position:absolute;right:0;bottom:0;width:12px;height:12px;background:var(--accent);cursor:nwse-resize}
+  #log{padding-left:1.35rem;max-height:11em;overflow:auto} #status{overflow-wrap:anywhere;min-height:1.5em}
+  [hidden]{display:none!important} dialog{border:1px solid #aec2ba;border-radius:10px;width:min(450px,94vw);padding:22px} dialog::backdrop{background:#18352f74}
+  @media(max-width:720px){main,main.collapsed{grid-template-columns:1fr}#propertiesDivider{display:flex;justify-content:center}#propertiesDivider::before{display:none}#toggleProperties{position:static;width:42px;height:24px}.desk{padding:20px}.letter{font-size:clamp(11px,3vw,22px)}}
+  @media print{body{background:white} body>*:not(#printpage){display:none!important} #printpage{display:block!important} #printpage svg{display:block}}
+</style>
+<script src="/board.js" defer></script>
+</head>
+<body>
+<header>
+  <strong id="boardName">组图</strong>
+
+  <div class="tools">
+    <button id="save">保存组图</button>
+    <button id="export">导出 SVG</button>
+    <button id="print">打印 / 存为 PDF</button>
+  </div>
+</header>
+<main>
+  <div class="desk">
+    <div id="canvas" aria-label="组图画布"><div id="empty">添加一张项目图或照片，开始排版</div></div>
+    <p id="status" role="status" aria-live="polite" class="note"></p>
+  </div>
+  <div id="propertiesDivider"><button id="toggleProperties" aria-controls="boardProperties" aria-expanded="true" title="收起组图属性栏">›</button></div>
+  <aside id="boardProperties">
+    <section>
+      <h2>添加面板</h2>
+      <div class="row"><select id="figures" aria-label="项目图"></select><button id="addFigure">添加</button></div>
+      <p class="note" id="sourceTitle" hidden></p>
+      <div class="tools"><button id="pasteFigures" title="粘贴 FigLab 中已复制的图（Ctrl+V）">粘贴图片</button><button id="addPhoto">添加照片</button><button id="placeholder">添加占位</button></div>
+      <input id="photo" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+
+    </section>
+    <section>
+      <h2>画布</h2>
+      <div class="fields"><label>宽度（cm）<input id="width" type="number" min="3" max="60" step="0.1"></label>
+      <label>高度（cm）<input id="height" type="number" min="3" max="60" step="0.1"></label></div>
+      <div class="tools"><button id="grid">均匀排列</button><button id="refresh">刷新原图</button></div>
+    </section>
+    <section id="panelSettings" hidden>
+      <h2 id="panelTitle">面板</h2>
+      <div class="fields" id="geometry"></div>
+      <div class="tools"><button id="replace">换成所选项目图</button><button id="remove">移除</button></div>
+      <p class="note">拖动面板调整位置，拖右下角调整大小。双击曲线图回到原图。</p>
+    </section>
+    <section>
+      <h2>AI 布局助手</h2>
+      <p id="aiNote" class="note"></p>
+      <textarea id="prompt" rows="2" maxlength="4000" aria-label="布局要求" placeholder="例如：A 和 B 放左侧上下排列，C 放右侧"></textarea>
+      <div class="row"><button class="primary" id="ask">预览布局</button><button id="apply" hidden>应用</button><button id="discard" hidden>取消预览</button></div>
+      <ol id="log" aria-live="polite" hidden></ol>
+    </section>
+  </aside>
+</main>
+<div id="printpage" hidden></div>
+</body>
+</html>

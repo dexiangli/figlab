@@ -1,0 +1,57 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --panel: #fff;
+  --surface: #f0f3f7;
+  --soft: #e9eef4;
+  --line: #d5dce6;
+  --ink: #202c3c;
+  --muted: #556579;
+  --accent: #225b9c;
+  --on-accent: #fff;
+  --warn: #a13e39;
+  --ok: #306b49;
+  --selected: #e5effd;
+  --selected-strong: #d1e2fa;
+  --changed: #fff2d7;
+  --changed-ink: #765315;
+  --excluded: #fbeae8;
+  --excluded-ink: #875c59;
+  --success: #e5f1e8;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161c25;
+  --panel: #202934;
+  --surface: #26313f;
+  --soft: #2e3a49;
+  --line: #415165;
+  --ink: #edf2fa;
+  --muted: #adc0d4;
+  --accent: #94c5ff;
+  --on-accent: #142233;
+  --warn: #ffaaa5;
+  --ok: #a9ddba;
+  --selected: #2b4260;
+  --selected-strong: #385779;
+  --changed: #46381f;
+  --changed-ink: #f6d68a;
+  --excluded: #492e34;
+  --excluded-ink: #e5b1af;
+  --success: #263f35;
+}
+
+dialog {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-width: min(42rem, calc(100vw - 24px));
+}
+
+dialog::backdrop { background: rgb(12 19 27 / 56%); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

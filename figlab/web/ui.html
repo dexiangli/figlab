@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>figlab · 本地科研绘图台</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="/theme.css">
+<script src="/theme.js"></script>
 <style>
-  :root{--bg:#fbfbfa;--panel:#fff;--line:#e4e2dd;--ink:#26262a;--muted:#86847f;
-        --accent:#2f6dae;--warn:#a64b42;--ok:#2e7d55;--soft:#f2f1ef}
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
@@ -15,17 +15,14 @@
   .top{height:42px;display:flex;align-items:center;gap:7px;padding:0 12px;
        border-bottom:1px solid var(--line);background:var(--panel)}
   .brand{font-weight:700;letter-spacing:.5px;margin-right:4px}
-  .tab{border:1px solid var(--line);background:#f7f6f4;border-radius:5px;
-       padding:3px 10px;cursor:pointer;font-size:12px;color:var(--muted)}
-  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-  button{border:1px solid var(--line);background:#f7f6f4;border-radius:5px;
+  button{border:1px solid var(--line);background:var(--surface);border-radius:5px;
          padding:3px 9px;cursor:pointer;font-size:12px;color:var(--ink);white-space:nowrap}
   button:hover:not(:disabled){border-color:var(--accent)}
   button:disabled{opacity:.4;cursor:default}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   button.danger{color:var(--warn)}
-  button.seg{background:#f7f6f4;color:var(--muted)}
-  button.seg.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.seg{background:var(--surface);color:var(--muted)}
+  button.seg.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .spacer{flex:1}
   #status{font-size:11.5px;color:var(--muted);max-width:34%;overflow:hidden;
           text-overflow:ellipsis;white-space:nowrap}
@@ -38,7 +35,7 @@
   #datapane{flex:2 1 0}
   .splitter{height:9px;flex:none;cursor:row-resize;display:flex;align-items:center;
             justify-content:center}
-  .splitter::before{content:"";width:48px;height:3px;border-radius:2px;background:#dcd9d3}
+  .splitter::before{content:"";width:48px;height:3px;border-radius:2px;background:var(--line)}
   .splitter:hover::before,.splitter.on::before{background:var(--accent)}
   .panehead{display:flex;align-items:center;gap:6px;flex:none;min-height:32px;
             flex-wrap:wrap;padding:3px 8px}   /* 窄窗口换行而不是把按钮裁掉 */
@@ -54,6 +51,9 @@
   @media (max-width:1100px){ .top > #status{max-width:150px} }
   #status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
           max-width:380px;min-width:0;flex:none}
+  #status.is-clipped,#sheetFoot.is-clipped{cursor:pointer;text-decoration:underline dotted}
+  #fullText{max-width:min(620px,90vw);border:1px solid var(--line);border-radius:7px}
+  #fullTextValue{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;user-select:text}
   .reason{width:170px;flex:none}
   /* ---------------- 图区 ---------------- */
   #viewport{position:relative;flex:1;min-height:120px;border:1px solid var(--line);
@@ -75,16 +75,16 @@
   body.boxsel #viewport{cursor:crosshair}
   body.boxsel #hotlayer{pointer-events:none}
   #boxbar{position:absolute;left:50%;top:5px;transform:translateX(-50%);display:none;
-          align-items:center;gap:5px;background:rgba(255,255,255,.97);
+          align-items:center;gap:5px;background:var(--panel);
           border:1px solid var(--line);border-radius:7px;padding:6px 8px;z-index:6;
           box-shadow:0 6px 18px rgba(0,0,0,.13);font-size:11.5px;white-space:nowrap;
           max-width:calc(100% - 14px);flex-wrap:wrap;justify-content:center;row-gap:5px}
   #boxbar.show{display:flex}
   #boxbar select{width:142px;padding:2px 2px;border:1px solid var(--line);
-                 border-radius:4px;font:inherit;font-size:11px;background:#fff;
+                 border-radius:4px;font:inherit;font-size:11px;background:var(--panel);
                  font-weight:600;text-overflow:ellipsis}
-  .curve.aim{background:#eef4fb;box-shadow:inset 3px 0 0 var(--accent);border-radius:3px}
-  .curve.hover{background:#f4f7fb}
+  .curve.aim{background:var(--selected);box-shadow:inset 3px 0 0 var(--accent);border-radius:3px}
+  .curve.hover{background:var(--surface)}
   #boxInfo{max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
            font-variant-numeric:tabular-nums}
   #boxbar input{width:58px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;
@@ -94,14 +94,14 @@
   /* ---------------- 选线：单击一条曲线就选中它 ---------------- */
   /* 放右上角：底部会压住 X 轴标题（试过，图上 Z'(Ω) 被挡了一半） */
   #aimbar{position:absolute;right:8px;top:8px;display:none;
-          align-items:center;gap:6px;background:rgba(255,255,255,.97);
+          align-items:center;gap:6px;background:var(--panel);
           border:1px solid var(--line);border-radius:7px;padding:5px 8px;z-index:6;
           box-shadow:0 6px 18px rgba(0,0,0,.13);font-size:11.5px;white-space:nowrap;
           max-width:calc(100% - 16px)}
   #aimbar.show{display:flex}
   #aimbar .sw{width:10px;height:10px;border-radius:50%;flex:none;
               box-shadow:0 0 0 2px rgba(0,0,0,.06)}
-  #aimbar .nm{font-weight:600;max-width:330px;overflow:hidden;text-overflow:ellipsis}
+  #aimbar .nm{font-weight:600;max-width:330px;min-width:0;white-space:normal;overflow-wrap:anywhere}
   #aimbar .n{color:var(--muted);font-variant-numeric:tabular-nums}
   #aimbar button{font-size:11px;padding:2px 7px;line-height:1.5}
   #svgbox [id^="cv"]{transition:opacity .12s linear}
@@ -126,28 +126,28 @@
                 cursor:zoom-in}
   #thumbbar .hint{margin-left:4px}
   /* ---------------- 数据区 ---------------- */
-  #sheetBox{flex:1;overflow:auto;border:1px solid var(--line);background:#fff;border-radius:6px}
+  #sheetBox{flex:1;overflow:auto;border:1px solid var(--line);background:var(--panel);border-radius:6px}
   #sheetBox table{border-collapse:collapse;width:100%;font-size:11.5px}
   #sheetBox th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;
                border-bottom:1px solid var(--line);border-right:1px solid var(--line);
                padding:4px 7px;text-align:left;white-space:nowrap}
-  #sheetBox td{border-bottom:1px solid #f2f1ef;border-right:1px solid #f5f4f2;
+  #sheetBox td{border-bottom:1px solid var(--soft);border-right:1px solid var(--soft);
                padding:2px 7px;white-space:nowrap;cursor:cell}
   #sheetBox td.num{text-align:right;font-family:Consolas,"Courier New",monospace;width:1%}
-  #sheetBox td.ro{color:var(--muted);cursor:default;background:#fafaf9;font-size:10.5px;width:1%}
+  #sheetBox td.ro{color:var(--muted);cursor:default;background:var(--surface);font-size:10.5px;width:1%}
   #sheetBox th{white-space:nowrap}
   #sheetBox th:last-child,#sheetBox td:last-child{width:auto;min-width:180px}
   #sheetBox td.rowno{cursor:pointer;text-align:center;width:36px;color:var(--muted);
-                     background:#fafaf9;font-size:10.5px}
-  #sheetBox tr.selrow td{background:#e8f1fc}
-  #sheetBox tr.selrow td.rowno{background:#cfe1f7;color:var(--accent);font-weight:700}
+                     background:var(--surface);font-size:10.5px}
+  #sheetBox tr.selrow td{background:var(--selected)}
+  #sheetBox tr.selrow td.rowno{background:var(--selected-strong);color:var(--accent);font-weight:700}
   #sheetBox td.active{outline:2px solid var(--accent);outline-offset:-2px}
-  #sheetBox tr.excluded td.num{color:#b9a3a0;text-decoration:line-through}
-  #sheetBox td.chg{background:#fff6e2;color:#8a5a12;font-weight:600}
+  #sheetBox tr.excluded td.num{color:var(--excluded-ink);text-decoration:line-through}
+  #sheetBox td.chg{background:var(--changed);color:var(--changed-ink);font-weight:600}
   #sheetBox .flag{display:inline-block;padding:0 6px;border-radius:8px;font-size:10px;
                   margin-right:4px}
-  #sheetBox .flag.ex{background:#fbeeec;color:var(--warn)}
-  #sheetBox .flag.ch{background:#fff3dd;color:#8a5a12}
+  #sheetBox .flag.ex{background:var(--excluded);color:var(--warn)}
+  #sheetBox .flag.ch{background:var(--changed);color:var(--changed-ink)}
   #sheetBox td .celledit{width:100%;padding:1px 3px;font:inherit;border:1px solid var(--accent);
                          border-radius:2px;outline:none}
   #sheetBox.readonly td{cursor:default}
@@ -167,7 +167,7 @@
      display:flex;align-items:center;gap:6px}
   label{display:block;font-size:11px;color:var(--muted);margin-top:6px}
   input,select{width:100%;border:1px solid var(--line);border-radius:4px;
-       padding:3px 6px;font-size:12px;background:#fff;color:var(--ink)}
+       padding:3px 6px;font-size:12px;background:var(--panel);color:var(--ink)}
   .row{display:flex;gap:6px;align-items:center;margin-top:6px}
   .row>*{flex:1;min-width:0}
   .kv{display:grid;grid-template-columns:84px 1fr;gap:2px 8px;font-size:11.5px}
@@ -178,14 +178,15 @@
   .swatch{width:10px;height:10px;border-radius:2px;flex:none}
   .letter{font-weight:700;width:13px;text-align:center;flex:none}
   .cname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .curve.aim .cname{white-space:normal;overflow-wrap:anywhere}
   .cnt{color:var(--muted);font-size:10.5px;white-space:nowrap}
   .mini{padding:1px 5px;font-size:10.5px}
   .objrow{display:flex;align-items:center;gap:4px;margin-bottom:4px}
   .objtext{flex:1;min-width:0;font-size:11.5px;padding:2px 5px}
   .objsize{width:52px;flex:none;font-size:11px;padding:2px 4px}
   .badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:10.5px;
-         background:#eef4ea;color:var(--ok)}
-  .badge.bad{background:#fbeeec;color:var(--warn)}
+         background:var(--success);color:var(--ok)}
+  .badge.bad{background:var(--excluded);color:var(--warn)}
   .fmts{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
   .fmts label{display:flex;align-items:center;gap:3px;margin:0;color:var(--ink);font-size:11.5px}
   .fmts input{width:auto}
@@ -199,7 +200,7 @@
   details.adv summary::before{content:"▸ ";color:var(--muted)}
   details.adv[open] summary::before{content:"▾ "}
   .note{font-size:10.5px;color:var(--muted);line-height:1.55;margin:6px 0 0;
-        padding:6px 7px;background:#fafaf9;border-radius:4px}
+        padding:6px 7px;background:var(--surface);border-radius:4px}
   .note code{font-family:Consolas,monospace;color:var(--ink)}
   /* ---------------- 左侧项目管理器（仿 Origin 的 Project Explorer） ---------------- */
   .proj{width:234px;flex:none;border-right:1px solid var(--line);background:var(--panel);
@@ -209,6 +210,7 @@
   .pjhead{display:flex;align-items:center;gap:3px;padding:5px 7px;flex:none;
           border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--muted)}
   .pjhead .spacer{flex:1}
+  #projectSearch{margin:5px 7px;min-width:0;padding:4px 6px;border:1px solid var(--line);border-radius:4px}
   .pjcols{display:flex;font-size:10.5px;color:var(--muted);flex:none;
           border-bottom:1px solid var(--line);padding:3px 8px;background:var(--soft)}
   .pjcols span:first-child{flex:1}
@@ -216,23 +218,24 @@
   .pjrow{display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:4px;
          cursor:pointer;white-space:nowrap}
   .pjrow:hover{background:var(--soft)}
-  .pjrow.active{background:#e8f1fc}
+  .pjrow.active{background:var(--selected)}
   .pjrow.active .pname{color:var(--accent);font-weight:600}
   .pjrow .caret{width:11px;flex:none;text-align:center;color:var(--muted);font-size:10px}
   .pjrow .ico{width:14px;flex:none;text-align:center;font-size:11px;opacity:.85}
   .pjrow .pname{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .pjrow.active .pname{white-space:normal;overflow-wrap:anywhere}
   .pjrow .ptype{color:var(--muted);font-size:10.5px;flex:none;padding-left:4px}
   .pjrow .pacts{display:none;gap:1px;flex:none}
   .pjrow:hover .pacts{display:flex}
   .pjrow .pacts button{border:0;background:transparent;color:var(--muted);
                        font-size:11px;line-height:13px;padding:0 3px;border-radius:3px}
-  .pjrow .pacts button:hover{background:#e8f1fc;color:var(--accent)}
+  .pjrow .pacts button:hover{background:var(--selected);color:var(--accent)}
   .pjfig{padding-left:15px;font-size:11.5px}
-  .pjrow.drop{outline:1px dashed var(--accent);background:#eef4fb}
+  .pjrow.drop{outline:1px dashed var(--accent);background:var(--selected)}
   .pjempty{color:var(--muted);font-size:11px;padding:6px 8px;line-height:1.6}
   /* ---------------- 文本框 ---------------- */
   textarea{width:100%;border:1px solid var(--line);border-radius:4px;padding:4px 6px;
-           font:12px/1.5 inherit;background:#fff;color:var(--ink);resize:vertical}
+           font:inherit;background:var(--panel);color:var(--ink);resize:vertical}
   /* ---------------- 曲线平移 / 选中 / 忙 ---------------- */
   .ofs{font-size:10px;color:var(--warn);white-space:nowrap;flex:none}
   /* 成品存哪儿：在导出面板里明确写出来，不用去猜 */
@@ -245,15 +248,15 @@
   .ofs button{border:0;background:transparent;color:var(--muted);padding:0 2px;
               font-size:10px;line-height:12px}
   .ofs button:hover{color:var(--accent);background:transparent}
-  #sheetBox td.selcell{background:#dbe9fb}
-  #sheetBox tr.selrow td.selcell{background:#c7dcf6}
-  #sheetBox thead th.selhead{background:#dbe9fb;color:var(--accent)}
+  #sheetBox td.selcell{background:var(--selected)}
+  #sheetBox tr.selrow td.selcell{background:var(--selected-strong)}
+  #sheetBox thead th.selhead{background:var(--selected);color:var(--accent)}
   body.moveline #viewport{cursor:move}
   body.moveline #hotlayer{pointer-events:none}
   /* 选线模式：光标变十字，鼠标扫过哪条线哪条亮起来，点一下即选中 */
   body.pickmode #viewport{cursor:crosshair}
   body.busy #viewport{cursor:progress}
-  button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   /* ---------------- 帮助弹层（? 键 / 顶栏按钮） ---------------- */
   #helpBtn{font-weight:700}
   #helpOverlay{position:fixed;inset:0;background:rgba(30,30,30,.35);z-index:60;
@@ -271,20 +274,37 @@
   #helpCard kbd{background:var(--soft);border:1px solid var(--line);border-radius:4px;
             padding:0 5px;font-family:inherit;font-size:11.5px}
   #helpClose{float:right}
+  #boardFrame{display:none;flex:1;min-width:0;border:0;background:var(--bg)}
+  .sideDivider{position:relative;width:12px;flex:none;background:var(--bg);z-index:2}
+  .sideDivider::before{content:'';position:absolute;top:0;bottom:0;left:50%;border-left:1px solid var(--line)}
+  .sideDivider button{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:16px;height:42px;padding:0;background:var(--panel);font-size:14px}
+  .top{display:flex;flex-wrap:wrap;height:auto;min-height:42px;padding-block:5px}
+  body{display:flex;flex-direction:column}
+  .main{height:auto;flex:1}
+  #proj.collapsed + .sideDivider{width:56px}
+  #proj.collapsed + .sideDivider::before{left:36px}
+  #proj.collapsed + .sideDivider button{left:36px;width:30px}
+  #boardPicker{max-height:min(70vh,500px);overflow:auto}
+  #boardChoices{display:grid;gap:6px;margin:10px 0}
+  #boardChoices button,#boardFolder,#boardError{white-space:normal;overflow-wrap:anywhere}
+  body.board-open .work,body.board-open #side,body.board-open #rightDivider,
+  body.board-open #undoBtn,body.board-open #redoBtn{display:none}
+  body.board-open #boardFrame{display:block}
 </style>
 </head>
 <body>
 <div class="top">
   <span class="brand">figlab</span>
-  <button id="toggleProj" title="收起/展开左侧项目管理器">⟨ 项目</button>
   <span class="sep"></span>
-  <div id="tabs" style="display:flex;gap:5px"></div>
   <button id="addTab">+ 新图</button>
+  <button id="openBoard">组图</button>
   <button id="delTab" class="danger">删除当前图</button>
   <span class="spacer"></span>
   <button id="undoBtn" title="Ctrl+Z 撤销一步">↶ 撤销</button>
   <button id="redoBtn" title="Ctrl+Y 重做一步">↷ 重做</button>
-  <button id="toggleSide" title="收起/展开右侧属性栏">⟩ 侧栏</button>
+  <button id="locationsBtn">文件位置</button>
+  <button id="themeToggle">切换深色</button>
   <button id="helpBtn" title="操作说明与快捷键（? 键）">?</button>
   <span id="status">载入中…</span>
 </div>
@@ -297,17 +317,22 @@
       <span class="spacer"></span>
       <button id="projNewFolder" class="mini" title="新建文件夹">＋ 文件夹</button>
     </div>
+    <input id="projectSearch" type="search" placeholder="搜索实验、样品或图名" aria-label="搜索项目树">
     <div class="pjcols"><span>名称</span><span>类型</span></div>
     <div id="projTree"></div>
     <div class="pjempty" style="padding:6px 8px;border-top:1px solid var(--line);flex:none">
       双击改名 · 拖图到文件夹归类 · 点图打开
     </div>
   </aside>
+  <div class="sideDivider"><button id="toggleProj" aria-controls="proj" title="收起项目管理器">‹</button></div>
+  <iframe id="boardFrame" title="组图窗口"></iframe>
   <div class="work">
     <!-- ======== 上：图 ======== -->
     <div class="pane" id="figpane">
       <div class="panehead">
         <span class="ptitle">图</span>
+        <button id="copyFigure" title="复制 SVG 到系统剪贴板，也可在组图窗口粘贴">复制矢量图</button>
+        <button id="downloadSvg" title="下载保留文字与曲线的 SVG">下载 SVG</button>
         <button data-zoom="in" title="放大">＋</button>
         <button data-zoom="out" title="缩小">－</button>
         <button id="fit">适应</button>
@@ -387,6 +412,7 @@
   </div>
 
   <!-- ======== 右：可收起属性栏 ======== -->
+  <div class="sideDivider" id="rightDivider"><button id="toggleSide" aria-controls="side" title="收起属性栏">›</button></div>
   <aside class="side" id="side">
     <section>
       <h3>① 选中的点 <span id="selBadge" class="badge">未选中</span></h3>
@@ -446,6 +472,7 @@
       <input id="expName" placeholder="20261113阻抗作图">
       <label class="chk" style="margin-top:6px"><input id="expAuto" type="checkbox" style="width:auto"> 按日期自动命名（日期+类别+作图）</label>
       <div class="row" style="margin-top:6px"><button id="applyName">应用文件名</button></div>
+      <label class="chk"><input id="autoExport" type="checkbox" style="width:auto"> 编辑后自动生成核验预览</label>
       <div id="outPath" class="outpath" title="PDF / PPT / 项目文件都放在这个文件夹里"></div>
       <button id="btnExport" class="primary" style="margin-top:8px;width:100%">导出到桌面并核验</button>
       <div id="verifyBox" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
@@ -536,12 +563,38 @@
       <div class="row">
         <label class="chk" style="margin:0"><input id="vBreak" type="checkbox"> 剔除处断线（不跨被删点连直线）</label>
       </div>
-      <button id="applyView" class="primary" style="margin-top:8px;width:100%">应用并重新导出核验</button>
+      <button id="applyView" class="primary" style="margin-top:8px;width:100%">应用样式与预览</button>
     </details>
   </aside>
 </div>
 <div id="tip"></div>
 
+<dialog id="newWindow">
+  <form method="dialog">
+    <p>选择新建的图窗口</p>
+    <button type="button" id="newSingle">单图</button>
+    <button type="button" id="newBoard">组图</button>
+    <button>取消</button>
+  </form>
+</dialog>
+<dialog id="boardPicker">
+  <form id="boardForm">
+    <strong>组图</strong>
+    <div id="boardChoices"></div>
+    <label>新组图名称 <input id="boardTitle" required maxlength="120"></label>
+    <p id="boardFolder"></p>
+    <button id="createFromPicker">新建并打开</button>
+    <button type="button" id="closeBoardPicker">取消</button>
+    <p id="boardError" role="status"></p>
+  </form>
+</dialog>
+<dialog id="fullText">
+  <form method="dialog">
+    <strong id="fullTextHeading">完整内容</strong>
+    <p id="fullTextValue"></p>
+    <button>关闭</button>
+  </form>
+</dialog>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -566,6 +619,53 @@ async function post(u, b){
                            body:JSON.stringify(b)});
   return r.json();
 }
+function showFullText(heading, value){
+  if(!value) return;
+  $('fullTextHeading').textContent = heading;
+  $('fullTextValue').textContent = value;
+  $('fullText').showModal();
+}
+function clippedDetails(id, heading){
+  const el = $(id);
+  const update = ()=>{
+    const clipped = el.scrollWidth > el.clientWidth;
+    el.tabIndex = clipped ? 0 : -1;
+    el.classList.toggle('is-clipped', clipped);
+    if(clipped) el.setAttribute('role', 'button');
+    else el.removeAttribute('role');
+    el.title = clipped ? el.textContent : '';
+  };
+  el.onclick = ()=>{ if(el.classList.contains('is-clipped')) showFullText(heading, el.textContent); };
+  el.onkeydown = event=>{
+    if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); el.click(); }
+  };
+  new ResizeObserver(update).observe(el);
+  new MutationObserver(update).observe(el, {childList:true, characterData:true, subtree:true});
+  update();
+}
+$('locationsBtn').onclick = async () => {
+  try {
+    const d = await get('/api/locations');
+    if (!d.project) throw new Error(d.error || '无法读取目录');
+    showFullText('文件位置',
+      '项目（图规格、组图和项目树）\n' + d.project +
+      '\n\n实验数据\n' + d.datasets + '\n\n内部预览与核验\n' + d.outputs +
+      '\n\n默认单图成品目录\n' + d.desktop + '\n\n单图按项目树的实验文件夹归档。组图 SVG 使用浏览器下载目录。');
+  } catch(error) { setStatus(error.message); }
+};
+clippedDetails('status', '状态详情');
+clippedDetails('sheetFoot', '工作表详情');
+for(const [id, heading] of [['sheetCurve','曲线全名'], ['boxCurve','框选曲线全名'], ['pptTarget','PPT 全名']]){
+  const select = $(id);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'mini';
+  button.textContent = '全名';
+  button.title = '查看' + heading;
+  button.onclick = ()=> showFullText(heading, select.selectedOptions[0]?.textContent);
+  select.after(button);
+  button.setAttribute('aria-label', '查看' + heading);
+}
 function setStatus(t){ $('status').textContent = t; }
 let busyN = 0;
 function markBusy(on){
@@ -578,20 +678,34 @@ function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g,
 function srcData(){ return S.src === 'raw' ? S.sheet.raw : S.sheet.data; }
 function cols(){ const d = srcData(); return d ? (d.numeric_columns || []) : []; }
 
-/* ====================== 页签 ====================== */
+/* ====================== 图窗口 ====================== */
 async function loadFigures(){
   const d = await get('/api/figures');
   S.figures = d.figures || [];
-  const box = $('tabs'); box.innerHTML = '';
-  S.figures.forEach(f=>{
-    const b = document.createElement('button');
-    b.className = 'tab' + (f.id === S.fid ? ' active' : '');
-    b.textContent = f.id;
-    b.title = f.id;
-    b.onclick = () => loadFigure(f.id);
-    box.appendChild(b);
-  });
 }
+
+// Keep project figure references so pasted panels stay linked to their source.
+const copiedFigures = new Map();
+function figuresToPaste(){ return [...copiedFigures.values()]; }
+function finishFigurePaste(ids){ ids.forEach(id => copiedFigures.delete(id)); }
+
+$('copyFigure').onclick = async () => {
+  if(!S.fid || !S.spec || document.body.classList.contains('board-open')) return;
+  const item = P.tree.figures.find(item => item.id === S.fid);
+  copiedFigures.set(S.fid, {figure:S.fid, title:item?.title || S.fid});
+  const button = $('copyFigure');
+  button.disabled = true;
+  try {
+    const result = await post('/api/clipboard', {figure:S.fid});
+    if (!result.ok) throw new Error(result.error || '剪贴板写入失败');
+    setStatus('SVG 已复制到系统剪贴板 · 组图待粘贴 ' + copiedFigures.size + ' 张');
+  } catch(error) {
+    setStatus('已复制到组图队列 · 系统剪贴板：' + error.message + ' · 可点「下载 SVG」');
+  } finally { button.disabled = false; }
+};
+$('downloadSvg').onclick = () => {
+  if (S.fid && S.spec) location.href = '/api/svg?id=' + encodeURIComponent(S.fid);
+};
 
 /* ====================== 项目管理器：文件夹 + 图窗口 ======================
    一张图 = 一个窗口，窗口归到文件夹。要的就是「一个项目里装很多任务」，
@@ -603,9 +717,13 @@ async function loadProject(){
   renderProject();
 }
 function figsIn(fid){ return (P.tree.figures || []).filter(f => f.folder === fid); }
+$('projectSearch').oninput = renderProject;
 function renderProject(){
   const box = $('projTree'); if(!box) return;
+  const scroll = box.scrollTop;
   const t = P.tree || {folders:[], figures:[]};
+  const terms = $('projectSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = text => terms.every(term => text.toLowerCase().includes(term));
   box.innerHTML = '';
   const root = document.createElement('div');
   root.className = 'pjrow';
@@ -614,8 +732,12 @@ function renderProject(){
                    '<span class="ptype">' + (t.figures||[]).length + '</span>';
   box.appendChild(root);
   (t.folders || []).forEach(f=>{
+    const all = figsIn(f.id);
+    const visible = all.filter(fig => matches([f.name, fig.title, fig.id, fig.spectrum_label].join(' ')));
+    if(terms.length && !visible.length && !matches(f.name)) return;
     const row = document.createElement('div');
-    row.className = 'pjrow';
+    row.className = 'pjrow' + (P.sel === f.id ? ' active' : '');
+    row.title = f.name;
     row.dataset.folder = f.id;
     row.innerHTML =
       '<span class="caret">' + (f.open === false ? '▸' : '▾') + '</span>' +
@@ -638,7 +760,7 @@ function renderProject(){
       if(id) projOp({op:'move-figure', id:id, folder:f.id});
     };
     box.appendChild(row);
-    if(f.open !== false) figsIn(f.id).forEach(fig => box.appendChild(figRow(fig)));
+    if(f.open !== false || terms.length) visible.forEach(fig => box.appendChild(figRow(fig)));
   });
   if(!(t.figures||[]).length){
     const e = document.createElement('div');
@@ -646,15 +768,20 @@ function renderProject(){
     e.textContent = '还没有图。点顶栏「+ 新图」建一个窗口。';
     box.appendChild(e);
   }
+  if(terms.length && box.children.length === 1){
+    const result = document.createElement('p');
+    result.className = 'pjempty'; result.textContent = '没有匹配的实验或图'; box.appendChild(result);
+  }
+  box.scrollTop = scroll;
 }
 function figRow(fig){
   const row = document.createElement('div');
   row.className = 'pjrow pjfig' + (fig.id === S.fid ? ' active' : '');
   row.draggable = true;
-  row.title = fig.id + '（双击改名）';
+  row.title = (fig.title || fig.id) + '（双击改名）';
   row.innerHTML = '<span class="caret"></span><span class="ico">📈</span>' +
     '<span class="pname">' + esc(fig.title || fig.id) + '</span>' +
-    '<span class="ptype">' + (fig.exists ? '图' : '缺') + '</span>';
+    '<span class="ptype">' + esc(fig.exists ? (fig.spectrum_label || '图') : '缺') + '</span>';
   row.onclick = ()=> loadFigure(fig.id);
   row.ondblclick = ev=>{ ev.stopPropagation(); renameFigure(fig); };
   row.ondragstart = ev=>{
@@ -750,6 +877,23 @@ function fitView(){
   applyTransform();
 }
 async function loadFigure(id){
+  clearTimeout(expTimer);
+  const frame = $('boardFrame');
+  if(S.figures.some(f => f.id === id && f.preset === 'board')){
+    if(frame.dataset.figure && frame.dataset.figure !== id && frame.contentWindow.hasUnsavedLayout?.() &&
+       !confirm('当前组图还有未保存的改动，仍要切换吗？')) return;
+    S.fid = id;
+    if(frame.dataset.figure !== id){
+      frame.dataset.figure = id;
+      frame.src = '/board.html?id=' + encodeURIComponent(id);
+    }
+    document.body.classList.add('board-open');
+    frame.contentWindow.refreshBoard?.();
+    await Promise.all([loadFigures(), loadProject()]);
+    setStatus('组图 ' + id);
+    return;
+  }
+  document.body.classList.remove('board-open');
   markBusy(true);
   try{
     const d = await get('/api/figure?id=' + encodeURIComponent(id));
@@ -872,13 +1016,13 @@ async function saveObj(kind, i, patch){
     await postSpec({texts});
   }
 }
-async function postSpec(patch, full){
+async function postSpec(patch){
   markBusy(true);
   try{
-    const d = await post('/api/spec', {figure:S.fid, patch:patch, fast: !full});
+    const d = await post('/api/spec', {figure:S.fid, patch:patch, fast:true});
     if(!d.ok){ setStatus('规格校验失败：' + (d.problems || []).join('；')); return null; }
     await applyRender(d);
-    if(!full) scheduleExport();
+    scheduleExport();
     return d;
   } finally { markBusy(false); }
 }
@@ -944,7 +1088,7 @@ function paintOutPath(){
   if(!dir){ box.textContent = ''; return; }
   box.innerHTML = '成品文件夹 <b>' + esc(dir) + '</b><br>' +
     '文件名都是 <b>' + esc(base) + '</b>（.pdf / .pptx / .figlab）' +
-    '<br>后台自动保存不进桌面，只有点「导出」才会放进来。';
+    '<br>编辑时保存数据和图规格。点「导出」才生成桌面成品。';
   box.title = dir;
 }
 function showTip(e,p){
@@ -953,9 +1097,14 @@ function showTip(e,p){
   const off = (Math.abs(p.off_x || 0) > 1e-9 || Math.abs(p.off_y || 0) > 1e-9)
     ? '  （整条曲线已平移 Δ' + (p.off_x || 0).toFixed(2) + ', ' + (p.off_y || 0).toFixed(2) + '）'
     : '';
-  t.textContent = p.letter + '  ' + p.curve + '  #' + p.point_index +
+  t.textContent = p.letter + '  ' + p.curve + '  #' + p.point_index + (p.wavelength_nm !== undefined
+    ? '  λ=' + p.wavelength_nm.toFixed(1) + ' nm  A=' + p.absorbance.toFixed(4)
+    : p.potential_V !== undefined
+    ? '  E=' + p.potential_V.toFixed(3) + ' V  Cₛ⁻²=' + p.inverse_Cs2.toPrecision(4) +
+      ' × 10¹² F⁻²  相位 ' + p.phase_deg.toFixed(1) + '°'
+    :
     '  f=' + p.freq_Hz.toPrecision(5) + ' Hz  Z\'' + p.Zp_ohm.toFixed(2) +
-    '  -Z\'\'=' + p.Zpp_neg_ohm.toFixed(2) + ' Ω' + off;
+    '  -Z\'\'=' + p.Zpp_neg_ohm.toFixed(2) + ' Ω') + off;
   t.style.display = 'block';
   t.style.left = (e.clientX + 12) + 'px'; t.style.top = (e.clientY + 12) + 'px';
 }
@@ -973,18 +1122,26 @@ function fillPoint(p){
     box.innerHTML = '<div class="kv"><b>提示</b><span>点击图上任意数据点</span></div>';
     form.style.display = 'none'; $('selBadge').textContent = '未选中'; return;
   }
-  form.style.display = 'block';
+  const isMs = p.potential_V !== undefined;
+  const isUv = p.wavelength_nm !== undefined;
+  form.style.display = isMs || isUv ? 'none' : 'block';
   $('selBadge').textContent = p.letter + ' #' + p.point_index;
   box.innerHTML = '<div class="kv">' +
     '<b>曲线</b><span>' + esc(p.curve) + '</span>' +
     '<b>点序</b><span>' + esc(p.point_index) + '</span>' +
-    '<b>频率</b><span>' + p.freq_Hz.toPrecision(6) + ' Hz</span>' +
-    '<b>Z\' / Ω</b><span>' + p.Zp_ohm.toFixed(4) + '</span>' +
+    (isUv ? '<b>波长 / nm</b><span>' + p.wavelength_nm.toFixed(1) + '</span>' +
+      '<b>吸光度</b><span>' + p.absorbance.toFixed(4) + '</span>'
+    : '<b>频率</b><span>' + p.freq_Hz.toPrecision(6) + ' Hz</span>' +
+    (isMs
+    ? '<b>电位 / V</b><span>' + p.potential_V.toFixed(3) + '</span>' +
+      '<b>Cₛ⁻² / 10¹² F⁻²</b><span>' + p.inverse_Cs2.toPrecision(5) + '</span>' +
+      '<b>相位 / °</b><span>' + p.phase_deg.toFixed(1) + '</span>'
+    : '<b>Z\' / Ω</b><span>' + p.Zp_ohm.toFixed(4) + '</span>' +
     '<b>Z\'\' / Ω</b><span>' + p.Zpp_ohm.toFixed(4) + '</span>' +
     '<b>-Z\'\' / Ω</b><span>' + p.Zpp_neg_ohm.toFixed(4) + '</span>' +
     ((Math.abs(p.off_x || 0) > 1e-9 || Math.abs(p.off_y || 0) > 1e-9) ?
       '<b>实测值</b><span>' + p.Zp_data.toFixed(4) + ' / ' + p.Zpp_data.toFixed(4) +
-      '（本曲线已平移）</span>' : '') +
+      '（本曲线已平移）</span>' : ''))) +
     '<b>颜色 / 符号</b><span>' + p.color + ' / ' + p.marker + '</span>' +
     '<b>归一化坐标</b><span>' + p.nx.toFixed(4) + ', ' + p.ny.toFixed(4) + '</span>' +
     '</div>';
@@ -1419,22 +1576,27 @@ async function loadThumbs(){
 }
 /* 改动只走「快渲染」：约 30 ms 出 SVG，页面立刻跟手；
    停手 1.2 s 再把 PDF、核验数字、桌面归档补齐。 */
+$('autoExport').checked = localStorage.getItem('figlab.autoExport') === '1';
+$('autoExport').onchange = () => {
+  localStorage.setItem('figlab.autoExport', $('autoExport').checked ? '1' : '0');
+  clearTimeout(expTimer);
+  if ($('autoExport').checked) scheduleExport();
+};
 function scheduleExport(){
-  if(!S.fid || S.src === 'raw') return;
+  if(!$('autoExport').checked || !S.fid || S.src === 'raw') return;
   clearTimeout(expTimer);
   expTimer = setTimeout(runExport, 1200);
 }
 async function runExport(){
-  if(!S.fid || S.src === 'raw' || expBusy) return;
+  if(!$('autoExport').checked || !S.fid || S.src === 'raw' || expBusy) return;
   // 正在拖线/拖点时不抢 CPU：拖动结束会自己再排一次导出
   if(mdrag || pdrag || adrag){ clearTimeout(expTimer); expTimer = setTimeout(runExport, 900); return; }
   expBusy = true; markBusy(true);
   try{
-    // 把界面这一份规格整份带上：页面是散点，导出的就必须是散点。
-    // deliver=false：自动保存只写内部 outputs，桌面一个文件都不多。
-    const d = await post('/api/export', {figure:S.fid, spec:S.spec, deliver:false});
+    const figure = S.fid;
+    const d = await post('/api/export', {figure, deliver:false});
+    if (S.fid !== figure) return;
     if(!d.ok){ setStatus('导出失败：' + (d.problems || [d.error || '']).join('；')); return; }
-    if(d.spec) S.spec = d.spec;
     applyVerify(d);
     fillExport(); fillCurves();
     await loadThumbs();
@@ -1525,7 +1687,7 @@ async function fillCurves(){
     row.innerHTML =
       '<span class="swatch" style="background:' + s.color + '"></span>' +
       '<span class="letter" style="color:' + s.color + '">' + s.letter + '</span>' +
-      '<span class="cname" title="' + esc(s.curve) + '（双击改显示名）">' +
+      '<span class="cname" title="' + esc(s.name || s.curve) + '（双击改显示名）">' +
       esc(s.name || s.curve) + '</span>' +
       '<span class="cnt">' + drawn + '点' +
       ((S.segments && S.segments[s.curve] > 1)
@@ -1547,7 +1709,14 @@ async function fillCurves(){
     const tb = document.createElement('button');
     tb.className = 'mini'; tb.textContent = '表';
     tb.onclick = () => { S.sheet.curve = s.curve; setSrc('work'); };
-    row.appendChild(cb); row.appendChild(tb);
+    const ref = document.createElement('button');
+    ref.className = 'mini' + (s.reference ? ' on' : '');
+    ref.textContent = '参考';
+    ref.title = '将这条曲线作为参考，减弱线条和点的视觉权重';
+    ref.setAttribute('aria-pressed', String(!!s.reference));
+    ref.onclick = () => postSpec({series:S.spec.series.map(item =>
+      item.curve === s.curve ? {...item, reference:!s.reference} : item)});
+    row.append(ref, cb, tb);
     const ox = parseFloat(s.off_x || 0), oy = parseFloat(s.off_y || 0);
     if(Math.abs(ox) > 1e-9 || Math.abs(oy) > 1e-9){
       const chip = document.createElement('span');
@@ -1876,7 +2045,7 @@ function paintAimBar(){
   const n = (S.points || []).filter(p => p.curve === S.aim).length;
   $('aimSw').style.background = s.color;
   $('aimName').textContent = s.letter + ' · ' + (s.name || s.curve);
-  $('aimName').title = S.aim;
+  $('aimName').title = s.name || s.curve;
   $('aimCnt').textContent = n + ' 点';
   $('aimFocus').textContent = S.aimFocus ? '恢复全部' : '只看这条';
   bar.classList.add('show');
@@ -2098,7 +2267,8 @@ function dataFromNorm(nx, ny){
 function onHotDown(e, i){
   e.stopPropagation();              // 别让 viewport 当成"拖画布"
   S.click0 = {x:e.clientX, y:e.clientY};   // 但要把起点记下，mouseup 才知道是"点了这个点 → 选这条线"
-  if(!$('dragToggle').checked) return;
+  if(!$('dragToggle').checked || S.points[i].potential_V !== undefined ||
+     S.points[i].wavelength_nm !== undefined) return;
   e.preventDefault();
   clearTimeout(expTimer);
   selectPoint(i);
@@ -2325,13 +2495,17 @@ $('ratioSheet').onclick = ()=> setRatio(S.ratio - 0.12);
 $('ratioDef').onclick = ()=> setRatio(0.6);
 function setSide(open){
   $('side').classList.toggle('collapsed', !open);
-  $('toggleSide').textContent = open ? '⟩ 侧栏' : '⟨ 侧栏';
+  $('toggleSide').textContent = open ? '›' : '‹';
+  $('toggleSide').title = open ? '收起属性栏' : '展开属性栏';
+  $('toggleSide').setAttribute('aria-expanded', String(open));
   localStorage.setItem('figlab.side', open ? '1' : '0');
 }
 $('toggleSide').onclick = ()=> setSide($('side').classList.contains('collapsed'));
 function setProj(open){
   $('proj').classList.toggle('collapsed', !open);
-  $('toggleProj').textContent = open ? '⟨ 项目' : '⟩ 项目';
+  $('toggleProj').textContent = open ? '‹' : '›';
+  $('toggleProj').title = open ? '收起项目管理器' : '展开项目管理器';
+  $('toggleProj').setAttribute('aria-expanded', String(open));
   localStorage.setItem('figlab.proj', open ? '1' : '0');
 }
 $('toggleProj').onclick = ()=> setProj($('proj').classList.contains('collapsed'));
@@ -2417,7 +2591,9 @@ $('btnLocate').onclick = async ()=>{
   if(!S.selected){ setStatus('请先选中一个点'); return; }
   S.sheet.curve = S.selected.curve;
   S.sheet.sel = new Set([String(S.selected.point_index)]);
-  S.sheet.cell = {idx:String(S.selected.point_index), field:'Zp_ohm'};
+  S.sheet.cell = {idx:String(S.selected.point_index),
+                  field:S.selected.wavelength_nm !== undefined ? 'wavelength_nm' :
+                    S.selected.potential_V !== undefined ? 'potential_V' : 'Zp_ohm'};
   S.sheet.active = S.sheet.cell;
   S.sheet.anchor = String(S.selected.point_index);
   S.sheet.colRange = null;
@@ -2475,6 +2651,12 @@ function moveCell(dr, dc){
   if(td) td.scrollIntoView({block:'nearest'});
 }
 window.addEventListener('keydown', e=>{
+  if($('fullText').open || e.defaultPrevented) return;
+  if(document.body.classList.contains('board-open') && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v'){
+    if($('boardFrame').contentWindow.pasteFigures?.()) e.preventDefault();
+    return;
+  }
+  if(document.body.classList.contains('board-open') && e.key !== '?' && e.key !== 'Escape') return;
   const tag = (e.target && e.target.tagName) || '';
   const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   // 帮助弹层最优先：开着时 Esc 关掉、? 也能关；别的键照旧
@@ -2577,7 +2759,9 @@ $('projFile').onchange = async ()=>{
   $('projFile').value = '';
   if(f) await openProjectFile(f);
 };
-$('addTab').onclick = async ()=>{
+$('addTab').onclick = () => $('newWindow').showModal();
+$('newSingle').onclick = async ()=>{
+  $('newWindow').close();
   const id = prompt('新图 ID（字母、数字、下划线）：','fig_' + Date.now().toString().slice(-5));
   if(!id) return;
   const preset = prompt('预设：inhouse / generic / dark_outline','inhouse');
@@ -2588,12 +2772,64 @@ $('addTab').onclick = async ()=>{
   if(d.project){ P.tree = d.project; renderProject(); }
   await loadFigure(id);
 };
+function boardDestination(){
+  return P.tree.folders.find(folder => folder.id === P.sel) ||
+    P.tree.folders.find(folder => P.tree.figures.some(fig => fig.id === S.fid && fig.folder === folder.id)) ||
+    P.tree.folders[0];
+}
+function showBoardPicker(){
+  const folder = boardDestination();
+  const choices = $('boardChoices');
+  choices.replaceChildren();
+  const boards = P.tree.figures.filter(item => item.preset === 'board' && item.exists);
+  for(const board of boards){
+    const button = document.createElement('button');
+    button.type = 'button';
+    const name = P.tree.folders.find(item => item.id === board.folder)?.name;
+    button.textContent = [name, board.title].filter(Boolean).join(' / ');
+    button.onclick = () => { $('boardPicker').close(); loadFigure(board.id); };
+    choices.append(button);
+  }
+  $('boardTitle').value = '';
+  $('boardTitle').placeholder = '例如：MS 与固体紫外对照';
+  $('boardFolder').textContent = folder ? '保存到 ' + folder.name : '';
+  $('boardError').textContent = '';
+  $('boardPicker').showModal();
+}
+$('newBoard').onclick = () => { $('newWindow').close(); showBoardPicker(); };
+$('openBoard').onclick = showBoardPicker;
+$('closeBoardPicker').onclick = () => $('boardPicker').close();
+$('boardForm').onsubmit = async event => {
+  event.preventDefault();
+  const title = $('boardTitle').value.trim();
+  if(!title){ $('boardError').textContent = '请输入组图名称'; return; }
+  $('createFromPicker').disabled = true;
+  try {
+    const id = 'board-' + crypto.randomUUID().slice(0, 12);
+    const d = await post('/api/board/create', {id, title, folder:boardDestination()?.id || ''});
+    if(!d.ok) throw new Error(d.error || '请重试');
+    $('boardPicker').close();
+    await loadFigures();
+    await loadFigure(d.id);
+  } catch(error){ $('boardError').textContent = '新建失败：' + error.message; }
+  finally { $('createFromPicker').disabled = false; }
+};
 $('delTab').onclick = async ()=>{
   if(!S.fid || !confirm('删除图「' + S.fid + '」的规格？（数据集与导出件不动）')) return;
+  if($('boardFrame').dataset.figure === S.fid){
+    delete $('boardFrame').dataset.figure;
+    $('boardFrame').removeAttribute('src');
+  }
   const d = await post('/api/figure/delete', {id:S.fid});
   if(d.project){ P.tree = d.project; renderProject(); }
   S.fid = (d.figures && d.figures.length) ? d.figures[0].id : null;
-  if(S.fid) await loadFigure(S.fid); else { await loadFigures(); setStatus('已无图页签'); }
+  if(S.fid) await loadFigure(S.fid); else {
+    S.spec = null;
+    $('svgbox').replaceChildren();
+    $('hotlayer').replaceChildren();
+    document.body.classList.remove('board-open');
+    await loadFigures(); setStatus('项目中暂无图');
+  }
 };
 
 /* ====================== 启动 ====================== */
@@ -2611,7 +2847,7 @@ $('delTab').onclick = async ()=>{
   const pick = (want && S.figures.some(f => f.id === want)) ? want
              : (S.figures.length ? S.figures[0].id : null);
   if(pick) await loadFigure(pick);
-  else setStatus('尚无图页签，点「+ 新图」创建');
+  else setStatus('项目中暂无图，点「+ 新图」创建');
   // ?src=raw 直达原始快照视图，方便对照与截图核对
   if(qs.get('src') === 'raw') setSrc('raw');
   if(qs.get('layer')) $('layerToggle').click();   // ?layer=1 直接进图层模式

@@ -82,6 +82,13 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     if data.get("fit_arc"):
         ck(bool(str(data.get("fit_disclaimer", "")).strip()),
            "开启圆拟合必须写 fit_disclaimer，声明为拟合而非实测（规范 §二.4）")
+    fit_window = data.get("ms_shared_window_V")
+    if fit_window is not None:
+        ck(data.get("spectrum") == "mott_schottky" and data.get("fit_linear") is True
+           and isinstance(fit_window, list) and len(fit_window) == 2
+           and all(_num(v) is not None for v in fit_window)
+           and float(fit_window[0]) < float(fit_window[1]),
+           "ms_shared_window_V 必须是 Mott–Schottky 拟合的起止电位")
 
     # ---- 画布与图层
     page = spec.get("page", {}) or {}
@@ -114,6 +121,9 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     ck(st.get("spines") == "all", "坐标框四边必须全画（spines='all'）")
     ck(st.get("tick_dir") == "in", "刻度必须朝内（tick_dir='in'）")
     ck(st.get("grid") is False, "默认无网格（grid=false）")
+    ck(isinstance(st.get("ms_frequency_key", False), bool), "ms_frequency_key 必须是布尔")
+    ck(st.get("axis_title_weight", "normal") in ("normal", "bold"),
+       "axis_title_weight 必须是 normal 或 bold")
     # 剔除处断线：缺省视为开启（老规格没有这个键也要能用）
     ck(isinstance(st.get("break_gaps", True), bool),
        "style.break_gaps 必须是 true/false")
@@ -151,6 +161,7 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
         curves = available_curves(spec)
     letters, markers = [], []
     for i, s in enumerate(series):
+        ck(isinstance(s.get("reference", False), bool), "曲线 reference 必须是布尔值")
         for k in ("curve", "letter", "color", "marker", "include"):
             ck(k in s, "series[%d] 缺少字段：%s" % (i, k))
         c = str(s.get("curve", ""))
@@ -205,6 +216,8 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
             if not isinstance(t, dict):
                 continue
             ck(bool(str(t.get("text", "")).strip()), "texts[%d].text 不能为空" % i)
+            ck(t.get("font_weight", "normal") in ("normal", "bold"),
+               "texts[%d].font_weight 必须是 normal 或 bold" % i)
             for k in ("nx", "ny"):
                 v = _num(t.get(k))
                 ck(v is not None and -0.05 <= v <= 1.05,

@@ -13,10 +13,11 @@ import sys
 import threading
 import traceback
 import urllib.parse
+import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .. import paths
-from . import api
+from .. import handoff, paths
+from . import api, board, clipboard
 
 UI = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
 
@@ -26,16 +27,16 @@ RENDER_LOCK = threading.RLock()
 
 # 只有真正碰 matplotlib 的接口才排队。以前整台服务（连 ui.html 和缩略图）都排在
 # 同一把锁后面，一次导出（约 0.9 s）就把所有点击卡住，表现成「按钮点了没反应」。
-HEAVY_GET = {"/api/figure", "/api/reports"}
+HEAVY_GET = {"/api/figure", "/api/reports", "/api/board/preview", "/api/board/revision", "/api/svg"}
 HEAVY_POST = {"/api/point", "/api/workbook", "/api/undo", "/api/redo",
               "/api/spec", "/api/export", "/api/curve-shift", "/api/pptx",
-              "/api/project/open"}
+              "/api/project/open", "/api/board/create", "/api/board/save", "/api/clipboard"}
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "figlab/1.0"
 
-    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+    def _send(self, code, body, ctype="application/json; charset=utf-8", attachment=None):
         if isinstance(body, (dict, list)):
             body = json.dumps(body, ensure_ascii=False).encode("utf-8")
         elif isinstance(body, str):
@@ -44,6 +45,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if attachment:
+            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(attachment))
         self.end_headers()
         self.wfile.write(body)
 
@@ -65,6 +68,30 @@ class Handler(BaseHTTPRequestHandler):
             if p in ("/", "/index.html"):
                 with open(UI, encoding="utf-8") as fh:
                     return self._send(200, fh.read(), "text/html; charset=utf-8")
+            if p in ("/board.js", "/board.html", "/theme.js", "/theme.css"):
+                name = p[1:]
+                ctype = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}[os.path.splitext(name)[1]]
+                with open(os.path.join(os.path.dirname(UI), name), encoding="utf-8") as fh:
+                    return self._send(200, fh.read(), ctype + "; charset=utf-8")
+            if p == "/api/locations":
+                return self._send(200, {"project": paths.ROOT, "datasets": paths.DATASETS,
+                                        "outputs": paths.OUTPUTS, "desktop": handoff.out_root()})
+            if p == "/api/svg":
+                fid = q["id"][0]
+                svg = board.preview(fid)
+                spec = board.figure_spec(fid)
+                return self._send(200, svg, "image/svg+xml", attachment=spec["export"]["base"] + ".svg")
+            if p == "/api/board/settings":
+                return self._send(200, {"ai": board.ai_available()})
+            if p == "/api/board":
+                spec = board.figure_spec(q["id"][0])
+                if spec.get("kind") != "board":
+                    return self._send(400, {"error": "请选择组图窗口"})
+                return self._send(200, spec["layout"])
+            if p == "/api/board/preview":
+                return self._send(200, board.preview(q["id"][0]), "image/svg+xml")
+            if p == "/api/board/revision":
+                return self._send(200, {"revision": board.revision(q["id"][0])})
             if p == "/api/figures":
                 return self._send(200, {"figures": api.figure_list()})
             if p == "/api/project":
@@ -110,7 +137,23 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         n = int(self.headers.get("Content-Length", 0))
         try:
+            if p == "/api/clipboard" and (self.headers.get("Origin") != "http://" + self.headers.get("Host", "")
+                                          or not self.headers.get("Content-Type", "").startswith("application/json")):
+                return self._send(403, {"error": "请在 FigLab 页面内复制"})
+            if p.startswith("/api/board/"):
+                origin = self.headers.get("Origin")
+                if origin and origin != "http://" + self.headers.get("Host", ""):
+                    return self._send(403, {"error": "请在 FigLab 页面内执行此操作"})
+                if not 0 <= n <= 64 * 1024 * 1024:
+                    return self._send(413, {"error": "文件过大，请分批导入"})
             body = json.loads(self.rfile.read(n) or b"{}")
+            if p == "/api/clipboard":
+                clipboard.copy_svg(board.preview(body["figure"]).encode("utf-8"))
+                return self._send(200, {"ok": True})
+            if p in ("/api/board/create", "/api/board/save"):
+                return self._send(200, board.save_layout(body, create=p.endswith("/create")))
+            if p == "/api/board/ai":
+                return self._layout_stream(body)
             # ?fast=1 或 body.fast：只渲染 SVG，不导出/不核验，供拖动与勾选即时反馈
             fast = bool(body.get("fast")) or q.get("fast", ["0"])[0] not in ("", "0")
             if p == "/api/point":
@@ -158,6 +201,32 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._err(e)
 
+    def _layout_stream(self, body):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        def emit(event):
+            self.wfile.write((json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8"))
+            self.wfile.flush()
+
+        events = board.layout_events(body)
+        try:
+            for event in events:
+                emit(event)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as error:
+            try:
+                message = f"AI 请求失败（HTTP {error.code}）" if hasattr(error, "code") else "AI 未返回有效的布局，请重试"
+                emit({"error": message})
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        finally:
+            events.close()
+
     def log_message(self, fmt, *args):
         pass  # 本地工具，不刷屏
 
@@ -173,7 +242,7 @@ def port_free(port: int) -> bool:
         s.close()
 
 
-def main(port: int = 8778) -> int:
+def main(port: int = 8778, open_browser: bool = False) -> int:
     if not port_free(port):
         print("端口 127.0.0.1:%d 已被占用。" % port)
         print("按缺陷清单第 3 条，重启前必须先结束监听该端口的进程，")
@@ -185,6 +254,8 @@ def main(port: int = 8778) -> int:
     print("figlab 已启动： http://127.0.0.1:%d  （仅本机监听，Ctrl+C 结束）" % port)
     print("数据集目录： %s" % paths.DATASETS)
     print("规格目录：   %s" % paths.SPECS)
+    if open_browser:
+        threading.Thread(target=webbrowser.open, args=(f"http://127.0.0.1:{port}",), daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

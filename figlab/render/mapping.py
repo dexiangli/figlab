@@ -51,14 +51,17 @@ def normalize_points(plotted: list[dict], limits: dict, layer: dict) -> list[dic
     out = []
     for pd in plotted:
         ox, oy = float(pd.get("off_x") or 0.0), float(pd.get("off_y") or 0.0)
+        fit_range = pd.get("fit_display_range")
         for x, y, row in pd["points"]:
             nx = left + (x - lx0) / (lx1 - lx0) * width
             ny = top + (1.0 - (y - ly0) / (ly1 - ly0)) * height
             out.append({
                 "curve": pd["curve"], "letter": pd["letter"],
-                "color": pd["color"], "marker": pd["marker"],
+                "color": (pd["context_color"] if fit_range and not fit_range[0] <= x <= fit_range[1]
+                          else pd["color"]),
+                "marker": pd["marker"],
                 "point_index": row.get("point_index"),
-                "freq_Hz": float(row["freq_Hz"]),
+                "freq_Hz": float(row["freq_Hz"]) if "freq_Hz" in row else None,
                 # Zp_ohm / Zpp_ohm 是**图上画出来**的位置（含整条曲线的平移）；
                 # *_data 才是工作副本里的实测值，拖动与提示都按这两个字段讲清楚
                 "Zp_ohm": x, "Zpp_ohm": -y,

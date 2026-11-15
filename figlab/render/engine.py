@@ -24,7 +24,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                     # noqa: E402
 import numpy as np                                  # noqa: E402
 from matplotlib import rcParams                     # noqa: E402
-from matplotlib.ticker import FormatStrFormatter    # noqa: E402
+from matplotlib.colors import to_hex, to_rgb         # noqa: E402
+from matplotlib.ticker import FormatStrFormatter, FuncFormatter  # noqa: E402
 
 from ..data.dataset import read_long                # noqa: E402
 from ..process import get_processor                 # noqa: E402
@@ -208,7 +209,8 @@ def _draw_texts(fig, spec, fonts):
         size = float(t.get("size_pt", spec["style"]["tick_pt"]))
         color = str(t.get("color", "#000000"))
         fig.text(nx, 1.0 - ny, str(t["text"]), fontsize=size, color=color,
-                 fontname=fonts, ha=str(t.get("ha", "left")),
+                 fontname=fonts, fontweight=t.get("font_weight", "normal"),
+                 ha=str(t.get("ha", "left")),
                  va=str(t.get("va", "bottom")), zorder=6)
         out.append({"id": str(t.get("id") or "t%d" % (i + 1)),
                     "text": str(t["text"]), "nx": nx, "ny": ny,
@@ -243,6 +245,25 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         groups[r["curve"]].append((r, inc))
 
     proc = get_processor(spectrum)
+    is_ms = spectrum == "mott_schottky"
+    is_uvvis = spectrum == "uvvis"
+    is_tauc = is_uvvis and data.get("view") == "tauc_preview"
+    if is_ms:
+        from ..process.mott_schottky import (
+            common_window, inverse_capacitance_squared, shared_intercept_window,
+        )
+
+        def coordinates(row):
+            return float(row["potential_V"]), inverse_capacitance_squared(row)
+    elif is_uvvis:
+        if is_tauc:
+            from ..process.uvvis import tauc_coordinates as coordinates
+        else:
+            def coordinates(row):
+                return float(row["wavelength_nm"]), float(row["absorbance"])
+    else:
+        def coordinates(row):
+            return float(row["Zp_ohm"]), -float(row["Zpp_ohm"])
     break_gaps = bool(st.get("break_gaps", True))
     # 连线画法：scatter 只画符号 / segment 直连（默认）/ smooth 过点平滑插值
     connect = str(st.get("connect") or "segment")
@@ -257,21 +278,32 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         pairs = groups.get(c)
         if not pairs:
             continue
-        rs = [r for r, inc in pairs if inc]
+        rs = [r for r, inc in pairs if inc and (not is_tauc or float(r["absorbance"]) >= 0)]
         if not rs:
             continue
         g = proc.geometry(rs)
         kept = proc.truncate(rs, g, data.get("tail_ohm", 0) or 0)
+        if not kept:
+            continue
         # 整条曲线的显示平移：Origin 里拖曲线看的是相对位置，数据本身不动。
         # 偏移只写在规格里（series.off_x / off_y），不写台账、不改工作副本，
         # 台账里也就不会出现一堆「曲线整体平移」这种假改动。
         ox = float(s.get("off_x") or 0.0)
         oy = float(s.get("off_y") or 0.0)
-        pts = [(float(r["Zp_ohm"]) + ox, -float(r["Zpp_ohm"]) + oy, r) for r in kept]
+        pts = [(x + ox, y + oy, r) for r in kept for x, y in [coordinates(r)]]
         # 被排除（框选删掉）的点在 Z' 轴上的位置：夹在两点之间就说明这里断开了
-        excl_z = sorted(float(r["Zp_ohm"]) + ox for r, inc in pairs if not inc)
+        if is_uvvis:
+            excl_z = sorted(coordinates(r)[0] + ox for r, inc in pairs
+                            if not inc or (is_tauc and float(r["absorbance"]) < 0))
+        elif is_ms:
+            excl_z = sorted(float(r["potential_V"]) + ox for r, inc in pairs
+                            if not inc or float(r["Zpp_ohm"]) >= 0)
+        else:
+            excl_z = sorted(float(r["Zp_ohm"]) + ox for r, inc in pairs if not inc)
         runs = split_runs(pts, excl_z) if break_gaps else [pts]
-        plotted.append({"curve": c, "letter": s["letter"], "color": s["color"],
+        reference = s.get("reference", False)
+        color = to_hex(0.58 * np.array(to_rgb(s["color"])) + 0.42) if reference else s["color"]
+        plotted.append({"curve": c, "letter": s["letter"], "color": color, "reference": reference,
                         "marker": s["marker"], "points": pts, "runs": runs,
                         "off_x": ox, "off_y": oy,
                         "geometry": g, "n_plotted": len(pts),
@@ -289,6 +321,20 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     raw_y = [y - pd["off_y"] for pd in plotted for _, y, _ in pd["points"]]
     lim_x = raw_x if lock_axis else all_x
     lim_y = raw_y if lock_axis else all_y
+    fit_info = {}
+    shared_window = data.get("ms_shared_window_V") if is_ms else None
+    frequency_key = is_ms and st.get("ms_frequency_key", False)
+    focus_fit = is_ms and st.get("ms_focus_fit", False)
+    if is_ms and data.get("fit_linear"):
+        fit_rows = {pd["curve"]: [r for r, inc in groups[pd["curve"]] if inc]
+                    for pd in plotted}
+        fit_info = (shared_intercept_window(fit_rows, shared_window)
+                    if shared_window is not None else common_window(fit_rows))
+        if data.get("show_fit_intercepts") and fit_info:
+            lim_x = lim_x + [fit_info[pd["curve"]]["zero_V"] + (0 if lock_axis else pd["off_x"])
+                             for pd in plotted if pd["curve"] in fit_info]
+            lim_y = lim_y + [0 if lock_axis else pd["off_y"]
+                             for pd in plotted if pd["curve"] in fit_info]
     pad = float(axs.get("pad_frac", 0.05))
     if axs.get("auto_from_data", True):
         lx0, lx1, lxi = nice_limits(lim_x, pad, target_ticks)
@@ -317,8 +363,25 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                        layer["width"] / 100.0, layer["height"] / 100.0])
 
     # 可选参考圆拟合：只作虚线叠加，明确声明为拟合而非实测（§二.4 / §八.7）
-    fit_info = {}
-    if data.get("fit_arc"):
+    if is_ms and data.get("fit_linear"):
+        for pd in plotted:
+            f = fit_info.get(pd["curve"])
+            if f:
+                x = np.array([f["x_from"], f["x_to"]])
+                origin = f["zero_V"] if shared_window is not None else 0
+                offset = 0 if shared_window is not None else f["intercept"]
+                ax.plot(x + pd["off_x"], f["slope"] * (x - origin) + offset + pd["off_y"],
+                        "--", linewidth=max(1.2, st["line_width_pt"]) if focus_fit else 0.85,
+                        color=pd["color"], zorder=2)
+                if data.get("show_fit_intercepts"):
+                    x = np.array([f["zero_V"], f["x_from"]])
+                    ax.plot(x + pd["off_x"], f["slope"] * (x - origin) + offset + pd["off_y"],
+                            linestyle=":" if not focus_fit else "-",
+                            linewidth=max(1.15, st["line_width_pt"]) if focus_fit else 0.9,
+                            color=pd["color"], zorder=1.5)
+        if fit_info and data.get("show_fit_intercepts"):
+            ax.axhline(0, color="#777777", linewidth=0.45, zorder=0)
+    elif data.get("fit_arc"):
         for pd in plotted:
             f = proc.fit([r for _, _, r in pd["points"]], pd["geometry"])
             fit_info[pd["curve"]] = f
@@ -336,6 +399,11 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     # 单独淡出某条曲线（框选删点时"只框这一条"），PDF 不受影响。
     cidx = {pd["curve"]: i for i, pd in enumerate(plotted)}
     for pd in plotted:
+        if focus_fit and pd["curve"] in fit_info:
+            fit = fit_info[pd["curve"]]
+            pd["fit_display_range"] = (fit["x_from"] + pd["off_x"] - 1e-6,
+                                       fit["x_to"] + pd["off_x"] + 1e-6)
+            pd["context_color"] = to_hex(0.38 * np.array(to_rgb(pd["color"])) + 0.62)
         pd["n_line_pts"] = 0
         if connect == "scatter":        # 散点图：一条线都不画
             continue
@@ -346,19 +414,26 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
             if len(xy) < 2:
                 continue
             ln, = ax.plot([p[0] for p in xy], [p[1] for p in xy], linestyle="-",
-                          linewidth=st["line_width_pt"], color=pd["color"], zorder=1)
+                          linewidth=st["line_width_pt"] * (0.65 if pd["reference"] else 1),
+                          color=pd.get("context_color", pd["color"]), zorder=1)
             ln.set_gid("cv%d-line-%d" % (cidx[pd["curve"]], si))
             pd["n_line_pts"] += len(xy)
     # 点少的曲线后画，减少被平行重复曲线整段压住的机会（不改数据、不改点序）
     for pd in sorted(plotted, key=lambda d: -d["n_plotted"]):
-        xs = [p[0] for p in pd["points"]]
-        ys = [p[1] for p in pd["points"]]
-        mks = ax.plot(xs, ys, linestyle="None", marker=MARKER_MAP[pd["marker"]],
-                      markersize=st["marker_size_pt"], markerfacecolor=pd["color"],
-                      markeredgecolor=pd["color"], markeredgewidth=0.25,
-                      color=pd["color"], zorder=3)
-        for m in mks:
-            m.set_gid("cv%d-mk" % cidx[pd["curve"]])
+        start, stop = pd.get("fit_display_range", (-math.inf, math.inf))
+        foreground = [p for p in pd["points"] if start <= p[0] <= stop]
+        context = [p for p in pd["points"] if not start <= p[0] <= stop]
+        if context:
+            context_marker, = ax.plot([p[0] for p in context], [p[1] for p in context], linestyle="None",
+                    marker=MARKER_MAP[pd["marker"]], markersize=st["marker_size_pt"] * 0.71,
+                    markeredgewidth=0, color=pd["context_color"], zorder=1)
+            context_marker.set_gid("cv%d-context" % cidx[pd["curve"]])
+        marker, = ax.plot([p[0] for p in foreground], [p[1] for p in foreground],
+                          linestyle="None", marker=MARKER_MAP[pd["marker"]],
+                          markersize=st["marker_size_pt"] * (0.75 if pd["reference"] else 1), markerfacecolor=pd["color"],
+                          markeredgecolor=pd["color"], markeredgewidth=0.25,
+                          color=pd["color"], zorder=3)
+        marker.set_gid("cv%d-mk" % cidx[pd["curve"]])
 
     # 线画完了才有力气回报"实际画了几个连线顶点"（散点=0，平滑>点数）
     for pd in plotted:
@@ -368,17 +443,23 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
 
     ax.set_xlim(lx0, lx1)
     ax.set_ylim(ly0, ly1)
-    ax.set_xticks(np.arange(lx0, lx1 + lxi * 0.5, lxi))
-    ax.set_yticks(np.arange(ly0, ly1 + lyi * 0.5, lyi))
+    x_ticks = np.arange(lx0, lx1 + lxi * 0.5, lxi)
+    y_ticks = np.arange(ly0, ly1 + lyi * 0.5, lyi)
+    ax.set_xticks(np.where(abs(x_ticks) < lxi * 1e-10, 0, x_ticks))
+    ax.set_yticks(np.where(abs(y_ticks) < lyi * 1e-10, 0, y_ticks))
     ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%g"))
+    if is_ms and axs.get("ms_y_exponent") == 10:
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:g}"))
     ax.tick_params(axis="both", which="major", direction=st["tick_dir"],
                    top=True, right=True, length=3.0, width=0.6, pad=3)
     for lbl in ax.get_xticklabels() + ax.get_yticklabels():
         lbl.set_fontfamily(fonts)
         lbl.set_fontsize(st["tick_pt"])
-    ax.set_xlabel(axs["x_title"], fontsize=st["title_pt"], fontname=fonts, labelpad=2)
-    ax.set_ylabel(axs["y_title"], fontsize=st["title_pt"], fontname=fonts, labelpad=2)
+    axis_title_style = dict(fontsize=st["title_pt"], fontname=fonts,
+                            fontweight=st.get("axis_title_weight", "normal"), labelpad=2)
+    ax.set_xlabel(axs["x_title"], **axis_title_style)
+    ax.set_ylabel(axs["y_title"], **axis_title_style)
     for sp in ax.spines.values():
         sp.set_visible(True)
         sp.set_linewidth(st.get("frame_line_width_pt", 0.6))
@@ -386,10 +467,36 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     if st.get("equal_aspect"):
         ax.set_aspect("equal", adjustable="box")
 
-    annotations = _place_annotations(ax, plotted, limits, st["tick_pt"], fonts, dpi,
-                                     spec, {s["curve"]: s for s in spec["series"]})
+    if frequency_key:
+        names = {s["curve"]: s["name"] for s in spec["series"]}
+        handles = [ax.plot([], [], linestyle="None", marker=MARKER_MAP[pd["marker"]],
+                           color=pd["color"], markersize=max(3.3, st["marker_size_pt"]),
+                           markeredgewidth=0,
+                           label=names[pd["curve"]])[0] for pd in plotted]
+        ax.legend(handles=handles, loc="upper left", frameon=False,
+                  prop={"family": fonts, "size": st["tick_pt"]},
+                  handlelength=0.9, handletextpad=0.45, borderaxespad=0.7, labelspacing=0.45)
+    if shared_window is not None and fit_info and data.get("show_fit_intercepts"):
+        zero = next(iter(fit_info.values()))["zero_V"]
+        if all(pd["off_x"] == pd["off_y"] == 0 for pd in plotted):
+            ax.annotate(f"{zero:.2f} V".replace("-", "−"), xy=(zero, 0),
+                        xytext=(0, 15), textcoords="offset points", ha="center",
+                        va="bottom", fontsize=st["tick_pt"], fontname=fonts,
+                        fontweight="bold" if focus_fit else "normal",
+                        arrowprops={"arrowstyle": "-|>", "lw": 0.55, "color": "#303030"},
+                        color="#222222", zorder=6)
+    annotations = ([] if frequency_key else
+                   _place_annotations(ax, plotted, limits, st["tick_pt"], fonts, dpi,
+                                      spec, {s["curve"]: s for s in spec["series"]}))
     texts = _draw_texts(fig, spec, fonts)
     points_norm = normalize_points(plotted, limits, layer)
+    if is_ms:
+        for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
+            point.update(potential_V=float(row["potential_V"]), inverse_Cs2=point["Zpp_neg_ohm"],
+                         phase_deg=float(row["phase_deg"]))
+    elif is_uvvis:
+        for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
+            point.update(wavelength_nm=float(row["wavelength_nm"]), absorbance=float(row["absorbance"]))
 
     return {
         "fig": fig, "ax": ax, "spec": spec, "plotted": plotted,

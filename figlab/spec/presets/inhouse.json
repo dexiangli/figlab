@@ -1,28 +1,30 @@
 {
   "name": "inhouse",
-  "label": "组内期刊模板（默认）",
+  "label": "黄金比例 · 组内期刊风格（默认）",
   "page": {
-    "w_cm": 8.0,
+    "w_cm": 9.708,
     "h_cm": 6.0
   },
   "layer": {
-    "left": 20.0,
-    "top": 10.0,
-    "width": 70.0,
-    "height": 70.0
+    "left": 17.0,
+    "top": 7.0,
+    "width": 74.0,
+    "height": 74.0
   },
   "style": {
-    "font": "Times New Roman",
-    "tick_pt": 9.0,
-    "title_pt": 11.0,
+    "font": "Arial",
+    "tick_pt": 8.0,
+    "title_pt": 9.5,
+    "axis_title_weight": "bold",
     "spines": "all",
     "tick_dir": "in",
     "grid": false,
     "equal_aspect": false,
     "fill_frame": true,
-    "line_width_pt": 0.6,
-    "marker_size_pt": 2.6,
-    "frame_line_width_pt": 0.6,
+    "line_width_pt": 1.25,
+    "marker_size_pt": 3.8,
+    "frame_line_width_pt": 0.75,
+    "ms_focus_fit": true,
     "break_gaps": true,
     "connect": "segment"
   },
@@ -41,14 +43,14 @@
     "zero_origin": false
   },
   "palette": [
-    "#1F4E79",
-    "#C00000",
-    "#2E7D32",
-    "#6A1B9A",
-    "#E65100",
-    "#00695C",
-    "#8E24AA",
-    "#B71C1C"
+    "#267EA0",
+    "#B5467A",
+    "#A96608",
+    "#35775D",
+    "#70549A",
+    "#AF4B33",
+    "#51647D",
+    "#226F70"
   ],
   "marker_cycle": [
     "circle",
@@ -65,5 +67,5 @@
       "pdf"
     ]
   },
-  "note": "画布 8×6 cm；图层 20/10/70/70% = 页边距左 1.6、上 0.6、右 0.8、下 1.2 cm，图框 5.6×4.2 cm；等比关闭，默认铺满。"
+  "note": "画布 9.708×6 cm，图框同为约 1.618:1；Arial 轴标题加粗、刻度常规；同色末端标记。"
 }

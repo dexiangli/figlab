@@ -11,15 +11,20 @@ from __future__ import annotations
 COMMON = ["curve", "point_index", "include", "note"]
 
 SPECTRUM_COLUMNS = {
+    "uvvis": ["curve", "point_index", "wavelength_nm", "absorbance", "include", "note"],
     # 规范 §一.5：曲线名、点序、频率、实部、虚部、参与标记、备注
     "eis": ["curve", "point_index", "freq_Hz", "Zp_ohm", "Zpp_ohm", "include", "note"],
     # 光热：时间由畸形时间戳解析为秒；只有温度一个测得量
     "photothermal": ["curve", "point_index", "time_s", "temp_C", "include", "note"],
+    "mott_schottky": ["curve", "point_index", "freq_Hz", "potential_V", "Zp_ohm",
+                      "Zpp_ohm", "phase_deg", "include", "note"],
 }
 
 NUMERIC_COLUMNS = {
+    "uvvis": ["wavelength_nm", "absorbance"],
     "eis": ["freq_Hz", "Zp_ohm", "Zpp_ohm"],
     "photothermal": ["time_s", "temp_C"],
+    "mott_schottky": ["freq_Hz", "potential_V", "Zp_ohm", "Zpp_ohm", "phase_deg"],
 }
 
 

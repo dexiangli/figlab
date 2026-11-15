@@ -1,5 +1,6 @@
 # 运行产物（每个部署环境自己生成，不入库）
 outputs/
+.venv/
 tmp*
 *.pyc
 __pycache__/

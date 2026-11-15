@@ -36,12 +36,28 @@ def out_root(spec: dict | None = None) -> str:
         p = str((spec.get("export") or {}).get("handoff_root") or "").strip()
         if p:
             return p
-    return os.path.join(paths.desktop(), OUTPUT_NAME)
+    configured = os.environ.get("FIGLAB_EXPORT_DIR", "").strip()
+    return paths.absolute(os.path.expanduser(configured)) if configured else os.path.join(paths.desktop(), OUTPUT_NAME)
 
 
 def figure_dir(base: str, spec: dict | None = None) -> str:
-    """一张图一个文件夹；同名图（同一天的同一张）落在同一个文件夹里。"""
-    return os.path.join(out_root(spec), sanitize_base(base))
+    """Named experiments share one desktop folder; unfiled figures retain their own."""
+    root = out_root(spec)
+    if spec and not spec.get("export", {}).get("handoff_root"):
+        tree = project.load()
+        figure = next((item for item in tree["figures"] if item["id"] == spec.get("id")), None)
+        if figure and figure["folder"] != project.DEFAULT_FOLDER:
+            folder = next((item for item in tree["folders"] if item["id"] == figure["folder"]), None)
+            if folder:
+                name = sanitize_base(folder["name"])
+                if any(item["id"] != folder["id"] and sanitize_base(item["name"]).casefold() == name.casefold()
+                       for item in tree["folders"]):
+                    name += " · " + folder["id"]
+                experiment = os.path.join(root, name)
+                # Reuse an earlier location after an experiment's exports have been filed together.
+                filed = os.path.join(experiment, "既有导出", sanitize_base(base))
+                return filed if os.path.isdir(filed) else experiment
+    return os.path.join(root, sanitize_base(base))
 
 
 def project_path(spec: dict) -> str:

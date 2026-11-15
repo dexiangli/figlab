@@ -25,10 +25,16 @@ def verify(spec: dict) -> dict:
     with open(pts_path, encoding="utf-8") as fh:
         ptsdoc = json.load(fh)
     points, annotations = ptsdoc["points"], ptsdoc["annotations"]
+    layer = spec["layer"]
+    left, top = layer["left"] / 100, layer["top"] / 100
+    right = left + layer["width"] / 100
+    bottom = top + layer["height"] / 100
+    visible_points = [p for p in points if left - 1e-6 <= p["nx"] <= right + 1e-6
+                      and top - 1e-6 <= p["ny"] <= bottom + 1e-6]
 
     frame = frame_from_png(png, [spec["page"]["w_cm"], spec["page"]["h_cm"]])
     frame_cmp = compare_frame(frame, spec, tol_cm=0.05)
-    hits = color_hit_rates(png, points, radii=(4, 12))
+    hits = color_hit_rates(png, visible_points, radii=(4, 12))
     vec = vector_check(outdir, base, spec)
     cols = colors_seen(png, spec)
     vis = visual_metrics(png, spec, points, annotations, frame)
@@ -47,7 +53,7 @@ def verify(spec: dict) -> dict:
         "data_fill_height_ge_70pct": vis["data_fill_height_frac"] >= 0.70,
         "all_curve_colors_present": cols["found"] == cols["expected"],
         # 「整段压住」按符号邻域判定（符号直径约 23 px，r=12 覆盖其半径）
-        "no_curve_fully_occluded": min_rate >= 0.80,
+        "no_curve_fully_occluded": min_rate >= 0.80 and {p["curve"] for p in points} == loose.keys(),
         "ink_not_empty": vis["ink_density_in_frame"] > 0.005,
     }
     failures = [k for k, v in checks.items() if not v]

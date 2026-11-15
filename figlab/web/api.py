@@ -145,6 +145,8 @@ def add_figure(fig_id: str, preset: str = "inhouse",
                dataset: str = "eis_20261107", folder: str = "") -> dict:
     if not fig_id or not re.fullmatch(r"[A-Za-z0-9_\-]+", fig_id):
         return {"ok": False, "error": "图 ID 只能用字母数字下划线连字符"}
+    if os.path.isfile(paths.spec_file(fig_id)):
+        return {"ok": False, "error": "窗口 ID 已存在"}
     if preset not in PRESET_NAMES:
         return {"ok": False, "error": "未知预设"}
     rows = read_long(paths.working(dataset), "eis")
@@ -276,14 +278,12 @@ def pptx_list() -> dict:
     out = []
     root = handoff.out_root()
     if os.path.isdir(root):
-        for name in sorted(os.listdir(root), reverse=True):
-            d = os.path.join(root, name)
-            if not os.path.isdir(d):
-                continue
-            for n in sorted(os.listdir(d)):
+        for d, dirs, names in os.walk(root):
+            dirs.sort(reverse=True)
+            for n in sorted(names):
                 if n.lower().endswith(".pptx"):
                     p = os.path.join(d, n)
-                    out.append({"folder": name, "name": n, "path": p,
+                    out.append({"folder": os.path.relpath(d, root), "name": n, "path": p,
                                 "bytes": os.path.getsize(p)})
     old = paths.archive_root()
     if os.path.isdir(old):

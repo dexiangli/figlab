@@ -178,7 +178,44 @@ def parse_photothermal(blob: bytes):
             "time_last_s": rows[-1]["time_s"] if rows else None}
 
 
-PARSERS = {"eis": parse_chi_text, "photothermal": parse_photothermal}
+def parse_mott_schottky(blob: bytes):
+    text, encoding = sniff_decode(blob)
+    header, separator, body = text.partition('Potential/V, Z\'/ohm, Z"/ohm, Z/ohm, Phase/deg')
+    if not separator:
+        raise ValueError("Expected a CHI impedance–potential export")
+    stamp, *params_lines = header.strip().splitlines()
+    params = dict(tuple(part.strip() for part in line.split("=", 1))
+                  for line in params_lines if "=" in line)
+    frequency = float(params["Frequency (Hz)"])
+    if frequency <= 0:
+        raise ValueError("Frequency must be positive")
+    rows = []
+    for line in body.strip().splitlines():
+        potential, real, imag, _, phase = map(float, line.split(","))
+        rows.append(dict(freq_Hz=frequency, potential_V=potential, Zp_ohm=real,
+                         Zpp_ohm=imag, phase_deg=phase))
+    return dict(encoding=encoding, stamp=stamp, params=params, rows=rows)
+
+
+def parse_uvvis(blob: bytes):
+    text, encoding = sniff_decode(blob)
+    lines = text.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.strip() == "nm,A"), None)
+    if start is None:
+        raise ValueError("Expected a UV–Vis CSV with nm,A columns")
+    rows = []
+    for line in lines[start + 1:]:
+        if not re.fullmatch(r"\s*\d+(?:\.\d+)?,\s*[+-]?\d+(?:\.\d+)?\s*", line):
+            continue
+        wavelength, absorbance = map(float, line.split(","))
+        rows.append(dict(wavelength_nm=wavelength, absorbance=absorbance))
+    if not rows or any(row["wavelength_nm"] <= 0 for row in rows):
+        raise ValueError("Expected positive wavelengths")
+    return dict(encoding=encoding, stamp="", params={"column_header": "nm,A"}, rows=rows)
+
+
+PARSERS = {"eis": parse_chi_text, "photothermal": parse_photothermal, "uvvis": parse_uvvis,
+           "mott_schottky": parse_mott_schottky}
 
 
 def group_by_stem(files: list[tuple[str, bytes]]):
