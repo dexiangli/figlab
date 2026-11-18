@@ -146,6 +146,8 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     ck(isinstance(st.get("ms_frequency_key", False), bool), "ms_frequency_key 必须是布尔")
     ck(st.get("axis_title_weight", "normal") in ("normal", "bold"),
        "axis_title_weight 必须是 normal 或 bold")
+    ck(st.get("font_weight", "normal") in ("normal", "bold"),
+       "font_weight 必须是 normal 或 bold")
     # 剔除处断线：缺省视为开启（老规格没有这个键也要能用）
     ck(isinstance(st.get("break_gaps", True), bool),
        "style.break_gaps 必须是 true/false")

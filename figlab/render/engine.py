@@ -26,6 +26,7 @@ import numpy as np                                  # noqa: E402
 from matplotlib import rcParams                     # noqa: E402
 from matplotlib.colors import to_hex, to_rgb         # noqa: E402
 from matplotlib.lines import Line2D                  # noqa: E402
+from matplotlib.text import Text                     # noqa: E402
 from matplotlib.ticker import AutoMinorLocator, FormatStrFormatter, FuncFormatter, MultipleLocator  # noqa: E402
 
 from ..data.dataset import read_long                # noqa: E402
@@ -595,6 +596,9 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                    _place_annotations(ax, plotted, limits, st["tick_pt"], fonts, dpi,
                                       spec, {s["curve"]: s for s in spec["series"]}))
     texts = _draw_texts(fig, spec, fonts)
+    if st.get("font_weight") == "bold":
+        for artist in fig.findobj(match=Text):
+            artist.set_fontweight("bold")
     points_norm = normalize_points(plotted, limits, layer)
     if is_ms:
         for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):

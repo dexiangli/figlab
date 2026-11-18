@@ -95,7 +95,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(400, {"error": "请选择组图窗口"})
                 return self._send(200, spec["layout"])
             if p == "/api/board/preview":
-                return self._send(200, board.preview(q["id"][0]), "image/svg+xml")
+                return self._send(200, board.preview(q["id"][0], q.get("panelWidth", [None])[0],
+                                                     q.get("hideLegend") == ["1"]),
+                                  "image/svg+xml")
             if p == "/api/board/revision":
                 return self._send(200, board.revision_info(q["id"][0]))
             if p == "/api/figures":
