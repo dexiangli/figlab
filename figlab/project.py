@@ -202,6 +202,7 @@ def snapshot() -> dict:
                     spec = json.load(fh)
                 spectrum = spec.get("data", {}).get("spectrum", "eis")
                 item["spectrum_label"] = ("组图" if spec.get("kind") == "board"
+                                          else "峰值柱图" if spec.get("data", {}).get("fscv_peak_bar")
                                           else "Tauc" if spec.get("data", {}).get("view") == "tauc_preview"
                                           else {"eis": "阻抗", "mott_schottky": "MS", "uvvis": "UV–Vis",
                                                 "photothermal": "光热", "fscv": "FSCV"}.get(spectrum, "图"))

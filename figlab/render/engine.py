@@ -283,6 +283,7 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     proc = get_processor(spectrum)
     is_ms = spectrum == "mott_schottky"
     is_fscv = spectrum == "fscv"
+    peak_bar = data.get("fscv_peak_bar")
     open_axes = st["spines"] == "left_bottom"
     is_uvvis = spectrum == "uvvis"
     is_tauc = is_uvvis and data.get("view") == "tauc_preview"
@@ -320,6 +321,10 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         if not pairs:
             continue
         rs = [r for r, inc in pairs if inc and (not is_tauc or float(r["absorbance"]) >= 0)]
+        if peak_bar:
+            boundary = min(data["break_before_point"])
+            rs = [r for r in rs if int(r["point_index"]) < boundary]
+            rs = [max(rs, key=lambda row: (float(row["current_nA"]), -int(row["point_index"])))] if rs else []
         if not rs:
             continue
         g = proc.geometry(rs)
@@ -332,6 +337,9 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         ox = float(s.get("off_x") or 0.0)
         oy = float(s.get("off_y") or 0.0)
         pts = [(x + ox, y + oy, r) for r in kept for x, y in [coordinates(r)]]
+        if peak_bar:
+            x = peak_bar["concentrations"][c]
+            pts = [(x + ox, y, row) for _, y, row in pts]
         # 被排除（框选删掉）的点在 Z' 轴上的位置：夹在两点之间就说明这里断开了
         if is_fscv:
             breaks = sorted(data.get("break_before_point", []))
@@ -375,6 +383,11 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     raw_y = [y - pd["off_y"] for pd in plotted for _, y, _ in pd["points"]]
     lim_x = raw_x if lock_axis else all_x
     lim_y = raw_y if lock_axis else all_y
+    if peak_bar:
+        error = peak_bar["illustrative_error_nA"]
+        width = peak_bar["width_uM"]
+        lim_x = [min(lim_x) - width, max(lim_x) + width]
+        lim_y = [0, min(lim_y) - error, max(lim_y) + error]
     fit_info = {}
     shared_window = data.get("ms_shared_window_V") if is_ms else None
     frequency_key = is_ms and st.get("ms_frequency_key", False)
@@ -459,6 +472,16 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                                        fit["x_to"] + pd["off_x"] + 1e-6)
             pd["context_color"] = to_hex(0.38 * np.array(to_rgb(pd["color"])) + 0.62)
         pd["n_line_pts"] = 0
+        if peak_bar:
+            x, y, row = pd["points"][0]
+            bars = ax.bar(x, y, width=width, color=pd["color"], edgecolor="#414752",
+                          linewidth=0.5, yerr=error if error else None, capsize=2.5,
+                          error_kw={"ecolor": "#30343b", "elinewidth": 0.65, "capthick": 0.65})
+            bars[0].set_gid("cv%d-mk" % cidx[pd["curve"]])
+            ax.annotate(f"{y:.2f}", (x, y + error), xytext=(0, 3),
+                        textcoords="offset points", ha="center", va="bottom",
+                        fontsize=st["tick_pt"], fontname=fonts)
+            continue
         if connect == "scatter":        # 散点图：一条线都不画
             continue
         for si, seg in enumerate(pd["runs"]):   # 一段一条线：剔除处断开，不跨断点连直线
@@ -474,6 +497,8 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
             pd["n_line_pts"] += len(xy)
     # 点少的曲线后画，减少被平行重复曲线整段压住的机会（不改数据、不改点序）
     for pd in sorted(plotted, key=lambda d: -d["n_plotted"]):
+        if peak_bar:
+            continue
         if is_fscv and connect != "scatter":
             continue
         start, stop = pd.get("fit_display_range", (-math.inf, math.inf))
@@ -511,6 +536,10 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         ax.set_xticks(np.where(abs(x_ticks) < lxi * 1e-10, 0, x_ticks))
         ax.set_yticks(np.where(abs(y_ticks) < lyi * 1e-10, 0, y_ticks))
     ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
+    if peak_bar:
+        positions = sorted(pd["points"][0][0] for pd in plotted)
+        positions = [x for x in positions if lx0 <= x <= lx1]
+        ax.set_xticks(positions, [f"{x:.2f}" for x in positions])
     ax.yaxis.set_major_formatter(FormatStrFormatter("%g"))
     if is_ms and axs.get("ms_y_exponent") == 10:
         ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:g}"))
@@ -550,7 +579,7 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                         fontweight="bold" if focus_fit else "normal",
                         arrowprops={"arrowstyle": "-|>", "lw": 0.55, "color": "#303030"},
                         color="#222222", zorder=6)
-    if is_fscv:
+    if is_fscv and not peak_bar:
         names = {series["curve"]: series.get("name") or series["curve"] for series in spec["series"]}
         handles = [Line2D([], [], color=pd["color"], linewidth=st["line_width_pt"],
                           linestyle="None" if connect == "scatter" else "-",

@@ -80,6 +80,22 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
         ck(data.get("spectrum") == "fscv" and isinstance(breaks, list)
            and all(type(index) is int and index > 1 for index in breaks),
            "break_before_point 必须是 FSCV 断线处的点序列表")
+    if "fscv_peak_bar" in data:
+        peak = data["fscv_peak_bar"]
+        ck(data.get("spectrum") == "fscv" and bool(data.get("break_before_point"))
+           and isinstance(peak, dict), "峰值柱图需要 FSCV 工作表和扫描分段")
+        if isinstance(peak, dict):
+            concentration = peak.get("concentrations", {})
+            ck(isinstance(concentration, dict) and bool(concentration)
+               and all(type(v) in (int, float) and _num(v) is not None and v >= 0
+                       for v in concentration.values())
+               and all(isinstance(s, dict) and s.get("curve") in concentration
+                       for s in (spec.get("series") or [])),
+               "峰值柱图需要每条曲线的浓度（µM）")
+            for key, minimum in (("width_uM", 1e-9), ("illustrative_error_nA", 0)):
+                value = peak.get(key)
+                ck(type(value) in (int, float) and _num(value) is not None
+                   and value >= minimum, "峰值柱图参数无效：" + key)
     tail = data.get("tail_ohm", 0)
     ck(_num(tail) is not None and float(tail or 0) >= 0,
        "data.tail_ohm 必须是 >=0 的数值（固定欧姆数截尾，禁止固定比例）")

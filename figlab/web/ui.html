@@ -460,6 +460,13 @@
     </section>
 
     <section>
+      <h3>备注</h3>
+      <p id="figureMethodNote" class="note" hidden></p>
+      <textarea id="figureNote" aria-label="图件备注" rows="3" maxlength="4000" placeholder="记录数据来源、处理方法或排版说明" style="width:100%;resize:vertical"></textarea>
+      <div class="row"><button id="saveFigureNote">保存备注</button></div>
+    </section>
+
+    <section>
       <h3>④ 导出</h3>
       <div class="fmts">
         <label><input type="checkbox" class="fmt" value="pdf" checked disabled> PDF（默认）</label>
@@ -1094,6 +1101,17 @@ function resetAnnot(curve){
 }
 function fillLayer(){
   const s = S.spec;
+  const editor = $('figureNote');
+  const savedNote = s.note || '';
+  if(editor.dataset.figure !== S.fid || editor.defaultValue !== savedNote){
+    editor.dataset.figure = S.fid;
+    editor.defaultValue = savedNote;
+    editor.value = savedNote;
+  }
+  const error = s.data?.fscv_peak_bar?.illustrative_error_nA;
+  const methodNote = $('figureMethodNote');
+  methodNote.hidden = !(error > 0);
+  methodNote.textContent = error > 0 ? `误差棒为 ±${error.toFixed(2)} nA 的示意值，未由重复实验估计。` : '';
   $('axTitleX').value = s.axis.x_title;
   $('axTitleY').value = s.axis.y_title;
   const box = $('objList'); box.innerHTML = '';
@@ -2801,6 +2819,11 @@ $('layerToggle').onclick = ()=>{
   if(S.layerMode && S.boxMode) boxSet(false);
   setStatus(S.layerMode ? '图层模式：拖动标注改位置、双击改文字（松手即写入规格并重导出）'
                         : '已退出图层模式');
+};
+$('saveFigureNote').onclick = async () => {
+  const note = $('figureNote').value.trim();
+  if(!S.spec || note === (S.spec.note || '')) return;
+  if(await postSpec({note})) setStatus('备注已保存');
 };
 $('applyAxis').onclick = ()=> postSpec({axis:{x_title:$('axTitleX').value.trim() || 'Z\' / Ω',
                                               y_title:$('axTitleY').value.trim() || '-Z\'\' / Ω'}});

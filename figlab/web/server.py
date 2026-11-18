@@ -97,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/board/preview":
                 return self._send(200, board.preview(q["id"][0]), "image/svg+xml")
             if p == "/api/board/revision":
-                return self._send(200, {"revision": board.revision(q["id"][0])})
+                return self._send(200, board.revision_info(q["id"][0]))
             if p == "/api/figures":
                 return self._send(200, {"figures": api.figure_list()})
             if p == "/api/project":

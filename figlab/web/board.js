@@ -5,6 +5,12 @@ const figure = new URLSearchParams(location.search).get("id");
 let figureTitle = figure;
 const NS = "http://www.w3.org/2000/svg";
 const coordinates = ["x", "y", "w", "h"];
+const defaultGrid = {preset:"auto", custom:"", gapX:2, gapY:2};
+const gridFields = ["gridPreset", "customGrid", "gridGapX", "gridGapY"];
+const edgeMarginMm = 0.5;
+const labelSizePt = 8;
+const pagePoints = () => layout.page.map(cm => cm * 72 / 2.54);
+const panelLetter = index => String.fromCharCode(97 + index);
 let layout = {page:[18, 12], panels:[]};
 let selected, draft, controller, drag, dirty = false;
 let available = false;
@@ -41,6 +47,30 @@ function place(element, panel) {
   for (const [index, style] of ["left", "top", "width", "height"].entries()) {
     element.style[style] = panel[coordinates[index]] + "%";
   }
+  const [pageWidth, pageHeight] = pagePoints();
+  const width = panel.w * pageWidth / 100, height = panel.h * pageHeight / 100;
+  const frame = panelFrame(width, height, images.get(panel.figure)?.aspect);
+  const image = element.querySelector("img");
+  if (image) Object.assign(image.style, {
+    left:`${100 * frame.x / width}%`, top:`${100 * frame.y / height}%`,
+    width:`${100 * frame.width / width}%`, height:`${100 * frame.height / height}%`,
+  });
+  const label = element.querySelector(".letter");
+  if (label) Object.assign(label.style, {
+    left:`${100 * frame.x / width}%`,
+    top:`${100 * (frame.y - frame.band) / height}%`,
+    fontSize:`${100 * frame.labelSize / pageWidth}cqw`,
+  });
+}
+
+function panelFrame(width, height, aspect) {
+  const labelSize = Math.min(labelSizePt, height / 3);
+  const band = labelSize * 1.4;
+  const innerHeight = height - band;
+  const fittedWidth = aspect ? Math.min(width, innerHeight * aspect) : width;
+  const fittedHeight = aspect ? fittedWidth / aspect : innerHeight;
+  return {x:(width-fittedWidth)/2, y:band+(innerHeight-fittedHeight)/2,
+    width:fittedWidth, height:fittedHeight, band, labelSize};
 }
 
 function draw() {
@@ -53,7 +83,6 @@ function draw() {
     const element = document.createElement("div");
     element.className = "panel" + (panel.id === selected ? " selected" : "");
     element.title = panel.title;
-    place(element, panel);
     const source = panel.photo || images.get(panel.figure)?.url;
     if (source) {
       const image = document.createElement("img");
@@ -65,13 +94,14 @@ function draw() {
     }
     const label = document.createElement("span");
     label.className = "letter";
-    label.textContent = String.fromCharCode(65 + index);
+    label.textContent = panelLetter(index);
     element.append(label);
     const handle = document.createElement("span");
     handle.className = "handle";
     if (!draft) element.append(handle);
     element.onpointerdown = event => startDrag(event, panel, element, event.target === handle);
     element.ondblclick = () => { if (panel.figure && !draft) parent.loadFigure(panel.figure); };
+    place(element, panel);
     canvas.append(element);
   });
   syncFields();
@@ -90,12 +120,26 @@ function syncFields() {
   $("panelSettings").hidden = !panel;
   if (panel) {
     const index = panelList().indexOf(panel);
-    $("panelTitle").textContent = `${String.fromCharCode(65 + index)} · ${panel.title}`;
+    $("panelTitle").textContent = `${panelLetter(index)} · ${panel.title}`;
     coordinates.forEach(key => { $(key).value = panel[key]; $(key).disabled = !!draft; });
   }
   for (const id of ["addPhoto", "placeholder", "grid", "remove", "save", "export", "print"]) {
     $(id).disabled = !!draft;
   }
+  gridFields.forEach(id => { $(id).disabled = !!draft; });
+  $("trimExport").disabled = !!draft;
+  $("boardNote").disabled = !!draft;
+  const notes = panelList().flatMap((panel, index) => {
+    const items = images.get(panel.figure)?.notes || [];
+    return items.map(note => {
+      const li = document.createElement("li");
+      li.textContent = `${panelLetter(index)} · ${note}`;
+      return li;
+    });
+  });
+  $("panelNotes").replaceChildren(...notes);
+  $("panelNotes").hidden = !notes.length;
+  $("grid").disabled = !!draft || !layout.panels.length;
   $("addFigure").disabled = $("replace").disabled = !!draft || !$("figures").value;
   const copied = parent.figuresToPaste?.().length || 0;
   $("pasteFigures").disabled = !!draft || !copied || layout.panels.length >= 26;
@@ -138,15 +182,15 @@ async function refreshImages(force = false) {
   for (const id of ids) {
     try {
       const query = "?id=" + encodeURIComponent(id);
-      const {revision} = await json("/api/board/revision" + query);
+      const {revision, notes} = await json("/api/board/revision" + query);
       const previous = images.get(id);
       if (!force && previous?.revision === revision) continue;
       const response = await fetch("/api/board/preview" + query);
       if (!response.ok) throw new Error("无法预览项目图");
-      const svg = await response.text();
+      const {svg, aspect} = trimProjectSvg(await response.text());
       const url = URL.createObjectURL(new Blob([svg], {type:"image/svg+xml"}));
       if (previous) URL.revokeObjectURL(previous.url);
-      images.set(id, {revision, svg, url});
+      images.set(id, {revision, svg, url, aspect, notes});
       changed = true;
     } catch (error) {
       const previous = images.get(id);
@@ -157,13 +201,82 @@ async function refreshImages(force = false) {
   if (changed && !drag) draw();
 }
 
-function arrangePanels() {
-  const n = layout.panels.length;
-  if (!n) return;
-  const columns = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / columns);
-  layout.panels.forEach((panel, index) => box(panel, {
-    x:(index % columns)*100/columns+2, y:Math.floor(index/columns)*100/rows+2,
-    w:100/columns-4, h:100/rows-4}));
+function trimProjectSvg(source) {
+  const root = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+  const original = root.viewBox?.baseVal;
+  if (!original?.width || !original.height) return {svg:source};
+  const aspect = original.width / original.height;
+  const figure = root.querySelector('[id="figure_1"]');
+  const backdrop = figure?.querySelector(':scope > [id="patch_1"]');
+  if (!backdrop) return {svg:source, aspect};
+
+  const measure = document.createElement("div");
+  measure.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none";
+  measure.setAttribute("aria-hidden", "true");
+  measure.append(root);
+  document.body.append(measure);
+  try {
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+    const inverse = root.getCTM().inverse();
+    for (const node of figure.querySelectorAll("path, rect, line, polyline, polygon, text, use, image, circle, ellipse")) {
+      if (backdrop.contains(node) || node.closest("defs, [clip-path]")) continue;
+      const bounds = node.getBBox();
+      if (!bounds.width && !bounds.height) continue;
+      const matrix = inverse.multiply(node.getCTM());
+      for (const x of [bounds.x, bounds.x+bounds.width]) {
+        for (const y of [bounds.y, bounds.y+bounds.height]) {
+          const point = new DOMPoint(x, y).matrixTransform(matrix);
+          left = Math.min(left, point.x); right = Math.max(right, point.x);
+          top = Math.min(top, point.y); bottom = Math.max(bottom, point.y);
+        }
+      }
+    }
+    if (!Number.isFinite(left) || right <= left || bottom <= top) return {svg:source, aspect};
+    const padding = 2;
+    left = Math.max(original.x, left-padding);
+    top = Math.max(original.y, top-padding);
+    right = Math.min(original.x+original.width, right+padding);
+    bottom = Math.min(original.y+original.height, bottom+padding);
+    const width = right-left, height = bottom-top;
+    if (width <= 0 || height <= 0) return {svg:source, aspect};
+    root.setAttribute("viewBox", `${left} ${top} ${width} ${height}`);
+    root.setAttribute("width", `${width}pt`);
+    root.setAttribute("height", `${height}pt`);
+    return {svg:new XMLSerializer().serializeToString(root), aspect:width/height};
+  } catch {
+    return {svg:source, aspect};
+  } finally {
+    measure.remove();
+  }
+}
+
+function gridPositions(page, count, settings) {
+  const {preset, custom, gapX, gapY} = settings;
+  const autoColumns = Math.ceil(Math.sqrt(count));
+  const format = preset === "custom" ? custom : preset;
+  const [columns, rows] = preset === "auto"
+    ? [autoColumns, Math.ceil(count / autoColumns)]
+    : format.split("x").map(Number);
+  if (count > columns * rows) throw new Error(`当前有 ${count} 个面板，请选择容量更大的网格或自动排版。`);
+
+  const [width, height] = page.map(cm => cm * 10);
+  const margin = edgeMarginMm;
+  const cellWidth = (width - 2 * margin - (columns - 1) * gapX) / columns;
+  const cellHeight = (height - 2 * margin - (rows - 1) * gapY) / rows;
+  if (cellWidth < .05 * width || cellHeight < .05 * height) {
+    throw new Error("间距过大。请减小间距，或增大画布。");
+  }
+  return Array.from({length:count}, (_, index) => ({
+    x: round((margin + index % columns * (cellWidth + gapX)) / width * 100),
+    y: round((margin + Math.floor(index / columns) * (cellHeight + gapY)) / height * 100),
+    w: Math.floor(cellWidth / width * 10000 + 1e-9) / 100,
+    h: Math.floor(cellHeight / height * 10000 + 1e-9) / 100,
+  }));
+}
+
+function arrangePanels(settings) {
+  const positions = gridPositions(layout.page, layout.panels.length, settings);
+  layout.panels.forEach((panel, index) => box(panel, positions[index]));
 }
 
 function addPanels(contents) {
@@ -180,7 +293,7 @@ function addPanels(contents) {
     layout.panels.push(panel);
     selected = panel.id;
   }
-  if (empty && contents.length > 1) arrangePanels();
+  if (empty && contents.length > 1) arrangePanels(defaultGrid);
   markChanged();
   draw();
   refreshImages();
@@ -214,12 +327,25 @@ function svgNode(name, attrs) {
 }
 
 function combinedSvg() {
-  const [w, h] = layout.page.map(value => value * 72 / 2.54);
-  const root = svgNode("svg", {width:`${layout.page[0]}cm`, height:`${layout.page[1]}cm`, viewBox:`0 0 ${w} ${h}`});
-  root.append(svgNode("rect", {width:w, height:h, fill:"white"}));
+  const [w, h] = pagePoints();
+  const boxes = layout.panels.map(panel => {
+    const frame = panelFrame(panel.w*w/100, panel.h*h/100, images.get(panel.figure)?.aspect);
+    return {...frame, x:panel.x*w/100+frame.x, y:panel.y*h/100+frame.y};
+  });
+  const padding = edgeMarginMm * 72 / 25.4;
+  const crop = layout.trimExport !== false;
+  const left = crop ? Math.max(0, Math.min(...boxes.map(box => box.x)) - padding) : 0;
+  const top = crop ? Math.max(0, Math.min(...boxes.map(box => box.y-box.band)) - padding) : 0;
+  const right = crop ? Math.min(w, Math.max(...boxes.map(box => box.x+box.width)) + padding) : w;
+  const bottom = crop ? Math.min(h, Math.max(...boxes.map(box => box.y+box.height)) + padding) : h;
+  const width = right-left, height = bottom-top;
+  const cm = value => (value * 2.54 / 72).toFixed(3);
+  const root = svgNode("svg", {width:`${cm(width)}cm`, height:`${cm(height)}cm`,
+    viewBox:`${left} ${top} ${width} ${height}`});
+  root.append(svgNode("rect", {x:left, y:top, width, height, fill:"white"}));
   layout.panels.forEach((panel, index) => {
-    const x = panel.x * w / 100, y = panel.y * h / 100;
-    const size = {x, y, width:panel.w*w/100, height:panel.h*h/100};
+    const {band, labelSize, ...size} = boxes[index];
+    const {x, y} = size;
     if (panel.figure) {
       const source = images.get(panel.figure)?.svg;
       if (!source) throw new Error(`无法导出：${panel.title} 的预览尚未载入`);
@@ -243,9 +369,9 @@ function combinedSvg() {
     } else {
       throw new Error("请先填入或移除占位面板，再导出");
     }
-    const label = svgNode("text", {x:x+size.width*.02, y:y+12, "font-size":12,
+    const label = svgNode("text", {x, y:y-band+labelSize, "font-size":labelSize,
       "font-weight":"bold", "font-family":"Arial,sans-serif"});
-    label.textContent = String.fromCharCode(65 + index);
+    label.textContent = panelLetter(index);
     root.append(label);
   });
   return root;
@@ -256,10 +382,11 @@ async function exportBoard(print) {
   await refreshImages();
   try {
     const svg = combinedSvg();
+    const width = svg.getAttribute("width"), height = svg.getAttribute("height");
     if (print) {
       $("printpage").replaceChildren(svg);
       const css = document.createElement("style");
-      css.textContent = `@page {size: ${layout.page[0]}cm ${layout.page[1]}cm; margin:0}`;
+      css.textContent = `@page {size: ${width} ${height}; margin:0}`;
       document.head.append(css);
       window.print();
       css.remove();
@@ -272,7 +399,7 @@ async function exportBoard(print) {
     link.download = `${figureTitle.replace(/[\\/:*?"<>|]/g, "-")}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status(`已导出 ${layout.panels.length} 个面板 · ${layout.page.join(" × ")} cm`);
+    status(`已导出 ${layout.panels.length} 个面板 · ${width} × ${height}`);
   } catch (error) { status(error.message); }
 }
 
@@ -352,6 +479,24 @@ async function loadFigures() {
 async function start() {
   const [saved, settings] = await Promise.all([json("/api/board?id=" + encodeURIComponent(figure)), json("/api/board/settings")]);
   layout = saved;
+  $("boardNote").value = layout.note || "";
+  $("boardNote").oninput = () => {
+    layout.note = $("boardNote").value;
+    markChanged();
+  };
+  const grid = {...defaultGrid, ...layout.grid};
+  $("gridPreset").value = grid.preset;
+  $("customGrid").value = grid.custom;
+  const showCustom = () => { $("customGridField").hidden = $("gridPreset").value !== "custom"; };
+  $("gridPreset").onchange = showCustom;
+  showCustom();
+  $("gridGapX").value = grid.gapX;
+  $("gridGapY").value = grid.gapY;
+  $("trimExport").checked = layout.trimExport !== false;
+  $("trimExport").onchange = () => {
+    layout.trimExport = $("trimExport").checked;
+    markChanged();
+  };
   available = settings.ai;
   $("boardName").textContent = figure;
   $("aiNote").textContent = available ? "布局要求、面板标题和位置会发送给 AI；图片留在本机。" : "AI 尚未配置，仍可手动排版。";
@@ -417,8 +562,26 @@ async function start() {
   };
   $("grid").onclick = () => {
     if (!layout.panels.length) return;
-    arrangePanels();
-    markChanged(); draw();
+    const [gapX, gapY] = ["gridGapX", "gridGapY"].map(id => $(id).valueAsNumber);
+    if (![gapX, gapY].every(gap => Number.isFinite(gap) && gap >= 0)) {
+      status("请输入大于或等于 0 的横向和纵向间距。");
+      return;
+    }
+    const preset = $("gridPreset").value;
+    const input = $("customGrid").value.trim();
+    const size = /^(\d+)\s*[x×*]\s*(\d+)$/i.exec(input);
+    if (preset === "custom" && (!size || size.slice(1).some(value => Number(value) < 1 || Number(value) > 26))) {
+      status("请输入列 × 行，例如 1*3 或 4×2。列数和行数须为 1–26 的整数。");
+      return;
+    }
+    const settings = {preset, custom:preset === "custom" ? `${Number(size[1])}x${Number(size[2])}` : input, gapX, gapY};
+    try {
+      arrangePanels(settings);
+      layout.grid = settings;
+      markChanged(); draw();
+    } catch (error) {
+      status(error.message);
+    }
   };
   $("save").onclick = async () => {
     const snapshot = JSON.stringify(layout);
