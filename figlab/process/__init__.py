@@ -5,3 +5,5 @@ from . import eis  # noqa: F401  注册 EISProcessor
 from . import mott_schottky  # noqa: F401
 from . import uvvis  # noqa: F401
 from . import fscv  # noqa: F401
+
+from . import xps

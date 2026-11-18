@@ -286,7 +286,8 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     is_fscv = spectrum == "fscv"
     peak_bar = data.get("fscv_peak_bar")
     open_axes = st["spines"] == "left_bottom"
-    is_uvvis = spectrum == "uvvis"
+    is_xps = spectrum == "xps"
+    is_uvvis = spectrum in ("uvvis", "xps")
     is_tauc = is_uvvis and data.get("view") == "tauc_preview"
     if is_ms:
         from ..process.mott_schottky import (
@@ -296,7 +297,10 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         def coordinates(row):
             return float(row["potential_V"]), inverse_capacitance_squared(row)
     elif is_uvvis:
-        if is_tauc:
+        if is_xps:
+            def coordinates(row):
+                return float(row["binding_energy_eV"]), float(row["intensity_cps"])
+        elif is_tauc:
             from ..process.uvvis import tauc_coordinates as coordinates
         else:
             def coordinates(row):
@@ -592,9 +596,12 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         table_curve = st.get("fscv_peak_table_curve")
         if table_curve:
             _draw_fscv_peak_table(ax, plotted, data["break_before_point"][0], table_curve, names, fonts)
-    annotations = ([] if frequency_key or is_fscv else
+    annotations = ([] if frequency_key or is_fscv or is_xps else
                    _place_annotations(ax, plotted, limits, st["tick_pt"], fonts, dpi,
                                       spec, {s["curve"]: s for s in spec["series"]}))
+    if is_xps:
+        from ..process.xps import decorate
+        decorate(ax, groups, spec)
     texts = _draw_texts(fig, spec, fonts)
     if st.get("font_weight") == "bold":
         for artist in fig.findobj(match=Text):
@@ -604,7 +611,7 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
             point.update(potential_V=float(row["potential_V"]), inverse_Cs2=point["Zpp_neg_ohm"],
                          phase_deg=float(row["phase_deg"]))
-    elif is_uvvis:
+    elif is_uvvis and not is_xps:
         for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
             point.update(wavelength_nm=float(row["wavelength_nm"]), absorbance=float(row["absorbance"]))
     elif is_fscv:
