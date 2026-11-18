@@ -33,10 +33,31 @@ def revision(figure):
     return revision_info(figure)["revision"]
 
 
-def preview(figure):
+def preview(figure, panel_width_mm=None, hide_legend=False):
     spec = figure_spec(figure)
+    if panel_width_mm is not None:
+        width = float(panel_width_mm)
+        if not math.isfinite(width) or not 20 <= width <= 600:
+            raise ValueError("统一面板宽度应在 20–600 mm 之间")
+        spec["page"].update(w_cm=width / 10, h_cm=width * 55 / 890)
+        spec["layer"].update(left=24.0, top=8.0, width=70.0, height=66.0)
+        spec["style"].update(font="Arial", tick_pt=6.5, title_pt=7,
+                             font_weight="bold", axis_title_weight="bold",
+                             spines="left_bottom", tick_dir="out",
+                             frame_line_width_pt=0.5, equal_aspect=False)
+        if spec["data"].get("spectrum") == "fscv":
+            concentrations = [re.search(r"\d+(?:\.\d+)?\s*[μµu]M\s*$", item["curve"])
+                              for item in spec["series"]]
+            if all(concentrations) and len({m.group().strip() for m in concentrations}) == len(concentrations):
+                for item, match in zip(spec["series"], concentrations):
+                    item["name"] = match.group().strip()
+        for item in spec.get("texts", []):
+            item["size_pt"] = 6.5
     built = prepare(spec)
     try:
+        legend = built["ax"].get_legend()
+        if hide_legend and legend:
+            legend.remove()
         return svg_string(built)
     finally:
         close(built)
@@ -65,6 +86,8 @@ def validate_layout(layout):
         ids.add(panel["id"])
         if panel.get("figure") and not re.fullmatch(r"[\w-]{1,120}", panel["figure"]):
             raise ValueError("无效的来源图 ID")
+        if "hideLegend" in panel and type(panel["hideLegend"]) is not bool:
+            raise ValueError("隐藏图例设置无效")
         if panel.get("photo") and not re.fullmatch(r"data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+", panel["photo"]):
             raise ValueError("照片需为 PNG、JPEG 或 WebP")
 

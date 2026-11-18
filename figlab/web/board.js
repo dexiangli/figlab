@@ -8,13 +8,16 @@ const coordinates = ["x", "y", "w", "h"];
 const defaultGrid = {preset:"auto", custom:"", gapX:2, gapY:2};
 const gridFields = ["gridPreset", "customGrid", "gridGapX", "gridGapY"];
 const edgeMarginMm = 0.5;
-const labelSizePt = 8;
+const labelSizePt = 12;
 const pagePoints = () => layout.page.map(cm => cm * 72 / 2.54);
 const panelLetter = index => String.fromCharCode(97 + index);
 let layout = {page:[18, 12], panels:[]};
 let selected, draft, controller, drag, dirty = false;
 let available = false;
 const images = new Map();
+const photos = new Map();
+const imageKey = panel => JSON.stringify([panel.figure, !!panel.hideLegend]);
+const panelImage = panel => images.get(imageKey(panel));
 const panelList = () => draft || layout.panels;
 const status = message => { $("status").textContent = message; };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -49,28 +52,66 @@ function place(element, panel) {
   }
   const [pageWidth, pageHeight] = pagePoints();
   const width = panel.w * pageWidth / 100, height = panel.h * pageHeight / 100;
-  const frame = panelFrame(width, height, images.get(panel.figure)?.aspect);
+  const frame = chartFrame(panel, width, height);
   const image = element.querySelector("img");
   if (image) Object.assign(image.style, {
     left:`${100 * frame.x / width}%`, top:`${100 * frame.y / height}%`,
     width:`${100 * frame.width / width}%`, height:`${100 * frame.height / height}%`,
   });
   const label = element.querySelector(".letter");
-  if (label) Object.assign(label.style, {
-    left:`${100 * frame.x / width}%`,
-    top:`${100 * (frame.y - frame.band) / height}%`,
-    fontSize:`${100 * frame.labelSize / pageWidth}cqw`,
-  });
+  if (label) {
+    const mark = panelLabelPosition(frame, panel);
+    Object.assign(label.style, {
+      left:`${100 * mark.x / width}%`, top:`${100 * mark.y / height}%`,
+      fontSize:`${100 * frame.labelSize / pageWidth}cqw`,
+    });
+  }
+}
+
+function panelLabelPosition(frame, panel) {
+  if (layout.uniformPanels && panel.figure) {
+    // Align the marker just above the top tick and to the left of the axis.
+    return {x:frame.x+Math.max(0, .24*frame.width-2.27*frame.labelSize), y:frame.y};
+  }
+  return {x:frame.x-frame.gutter, y:frame.y};
+}
+
+function panelAspect(panel) {
+  if (panel.figure && layout.uniformPanels) return 89/55;
+  const photo = photos.get(panel.id);
+  if (photo && photo.source === panel.photo) {
+    return photo.width / (layout.trimPhotos === false ? photo.height : photo.cropHeight);
+  }
+  return panelImage(panel)?.aspect;
 }
 
 function panelFrame(width, height, aspect) {
-  const labelSize = Math.min(labelSizePt, height / 3);
-  const band = labelSize * 1.4;
-  const innerHeight = height - band;
-  const fittedWidth = aspect ? Math.min(width, innerHeight * aspect) : width;
-  const fittedHeight = aspect ? fittedWidth / aspect : innerHeight;
-  return {x:(width-fittedWidth)/2, y:band+(innerHeight-fittedHeight)/2,
-    width:fittedWidth, height:fittedHeight, band, labelSize};
+  const labelSize = Math.min(labelSizePt, width / 4, height / 3);
+  const gutter = labelSize * 1.15;
+  const innerWidth = width - gutter;
+  const fittedWidth = aspect ? Math.min(innerWidth, height * aspect) : innerWidth;
+  const fittedHeight = aspect ? fittedWidth / aspect : height;
+  return {x:gutter+(innerWidth-fittedWidth)/2, y:(height-fittedHeight)/2,
+    width:fittedWidth, height:fittedHeight, gutter, labelSize};
+}
+
+function uniformPanelWidth() {
+  if (!layout.uniformPanels) return null;
+  const [w, h] = pagePoints();
+  const widths = panelList().filter(panel => panel.figure)
+    .map(panel => Math.min(panel.w*w, panel.h*h*89/55)/100);
+  return widths.length ? Math.min(...widths) : null;
+}
+
+function chartFrame(panel, width, height) {
+  const uniform = layout.uniformPanels && panel.figure;
+  if (uniform) {
+    const fittedWidth = uniformPanelWidth();
+    const fittedHeight = fittedWidth*55/89;
+    return {x:(width-fittedWidth)/2, y:(height-fittedHeight)/2, width:fittedWidth,
+      height:fittedHeight, gutter:0, labelSize:Math.min(labelSizePt, fittedWidth/4, fittedHeight/3)};
+  }
+  return panelFrame(width, height, panelAspect(panel));
 }
 
 function draw() {
@@ -83,7 +124,9 @@ function draw() {
     const element = document.createElement("div");
     element.className = "panel" + (panel.id === selected ? " selected" : "");
     element.title = panel.title;
-    const source = panel.photo || images.get(panel.figure)?.url;
+    const photo = photos.get(panel.id);
+    const source = (layout.trimPhotos !== false && photo?.source === panel.photo && photo?.url) ||
+      panel.photo || panelImage(panel)?.url;
     if (source) {
       const image = document.createElement("img");
       image.src = source;
@@ -122,15 +165,21 @@ function syncFields() {
     const index = panelList().indexOf(panel);
     $("panelTitle").textContent = `${panelLetter(index)} · ${panel.title}`;
     coordinates.forEach(key => { $(key).value = panel[key]; $(key).disabled = !!draft; });
+    $("panelLegendField").hidden = !panel.figure;
+    $("hidePanelLegend").checked = !!panel.hideLegend;
+    $("hidePanelLegend").disabled = !!draft;
   }
   for (const id of ["addPhoto", "placeholder", "grid", "remove", "save", "export", "print"]) {
     $(id).disabled = !!draft;
   }
   gridFields.forEach(id => { $(id).disabled = !!draft; });
   $("trimExport").disabled = !!draft;
+  $("exportMargin").disabled = !!draft || layout.trimExport === false;
+  $("trimPhotos").disabled = !!draft;
+  $("uniformPanels").disabled = !!draft;
   $("boardNote").disabled = !!draft;
   const notes = panelList().flatMap((panel, index) => {
-    const items = images.get(panel.figure)?.notes || [];
+    const items = panelImage(panel)?.notes || [];
     return items.map(note => {
       const li = document.createElement("li");
       li.textContent = `${panelLetter(index)} · ${note}`;
@@ -177,28 +226,109 @@ function startDrag(event, panel, element, resize) {
 }
 
 async function refreshImages(force = false) {
-  const ids = [...new Set(panelList().map(panel => panel.figure).filter(Boolean))];
-  let changed = false;
-  for (const id of ids) {
+  const projectPanels = panelList().filter(panel => panel.figure);
+  const previews = new Map(projectPanels.map(panel => [imageKey(panel), panel]));
+  const fittedWidth = uniformPanelWidth();
+  const uniformWidth = fittedWidth ? Math.max(20, fittedWidth*25.4/72).toFixed(1) : "";
+  let changed = await refreshPhotos();
+  for (const [key, previous] of images) {
+    if (!previews.has(key)) {
+      URL.revokeObjectURL(previous.url);
+      images.delete(key);
+    }
+  }
+  for (const [key, panel] of previews) {
+    const id = panel.figure;
     try {
       const query = "?id=" + encodeURIComponent(id);
       const {revision, notes} = await json("/api/board/revision" + query);
-      const previous = images.get(id);
-      if (!force && previous?.revision === revision) continue;
-      const response = await fetch("/api/board/preview" + query);
+      const previous = images.get(key);
+      if (!force && previous?.revision === revision && previous.uniformWidth === uniformWidth) continue;
+      const request = query + (uniformWidth ? "&panelWidth=" + uniformWidth : "")
+        + (panel.hideLegend ? "&hideLegend=1" : "");
+      const response = await fetch("/api/board/preview" + request);
       if (!response.ok) throw new Error("无法预览项目图");
-      const {svg, aspect} = trimProjectSvg(await response.text());
+      const source = await response.text();
+      // Each uniform panel retains the same viewport so all axis frames align.
+      const trimmed = trimProjectSvg(source);
+      const {svg, aspect} = uniformWidth ? {svg:source, aspect:89/55} : trimmed;
       const url = URL.createObjectURL(new Blob([svg], {type:"image/svg+xml"}));
       if (previous) URL.revokeObjectURL(previous.url);
-      images.set(id, {revision, svg, url, aspect, notes});
+      images.set(key, {revision, svg, url, aspect, notes, uniformWidth,
+        inkLeft:uniformWidth ? trimmed.inkLeft : 0});
       changed = true;
     } catch (error) {
-      const previous = images.get(id);
-      if (previous) { URL.revokeObjectURL(previous.url); images.delete(id); changed = true; }
+      const previous = images.get(key);
+      if (previous) { URL.revokeObjectURL(previous.url); images.delete(key); changed = true; }
       status(`${id} · ${error.message}`);
     }
   }
   if (changed && !drag) draw();
+}
+
+function photoSvg(photo, frame) {
+  const root = svgNode("svg", {...frame, viewBox:`0 ${photo.top} ${photo.width} ${photo.cropHeight}`,
+    overflow:"hidden"});
+  root.append(svgNode("image", {x:0, y:0, width:photo.width, height:photo.height, href:photo.source}));
+  return root;
+}
+
+async function photoBounds(source) {
+  const image = new Image();
+  image.src = source;
+  await image.decode();
+  const {naturalWidth:width, naturalHeight:height} = image;
+  const canvas = document.createElement("canvas");
+  const scale = Math.min(1, 1200 / Math.max(width, height));
+  canvas.width = Math.max(1, Math.round(width*scale));
+  canvas.height = Math.max(1, Math.round(height*scale));
+  const context = canvas.getContext("2d", {willReadFrequently:true});
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const rowHasContent = row => {
+    const end = 4 * (row+1) * canvas.width;
+    for (let i = end-4*canvas.width; i < end; i += 4) {
+      if (pixels[i+3] > 20 && Math.min(pixels[i], pixels[i+1], pixels[i+2]) < 245) return true;
+    }
+    return false;
+  };
+  let first = 0, last = canvas.height-1;
+  while (first <= last && !rowHasContent(first)) first++;
+  while (last > first && !rowHasContent(last)) last--;
+  const top = first <= last ? Math.max(0, Math.floor((first-2)*height/canvas.height)) : 0;
+  const bottom = first <= last ? Math.min(height, Math.ceil((last+3)*height/canvas.height)) : height;
+  const photo = {source, width, height, top, cropHeight:bottom-top};
+  if (photo.cropHeight < height) {
+    const svg = photoSvg(photo, {width, height:photo.cropHeight});
+    photo.url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], {type:"image/svg+xml"}));
+  }
+  return photo;
+}
+
+async function refreshPhotos() {
+  let changed = false;
+  const panels = panelList().filter(panel => panel.photo);
+  for (const [id, previous] of photos) {
+    if (panels.some(panel => panel.id === id && panel.photo === previous.source)) continue;
+    if (previous.url) URL.revokeObjectURL(previous.url);
+    photos.delete(id);
+    changed = true;
+  }
+  await Promise.all(panels.map(async panel => {
+    if (photos.has(panel.id)) return;
+    try {
+      const parsed = await photoBounds(panel.photo);
+      if (!panelList().some(item => item.id === panel.id && item.photo === panel.photo) || photos.has(panel.id)) {
+        if (parsed.url) URL.revokeObjectURL(parsed.url);
+        return;
+      }
+      photos.set(panel.id, parsed);
+      changed = true;
+    } catch {
+      // Keep the original image available if its bounds cannot be inspected.
+    }
+  }));
+  return changed;
 }
 
 function trimProjectSvg(source) {
@@ -239,10 +369,11 @@ function trimProjectSvg(source) {
     bottom = Math.min(original.y+original.height, bottom+padding);
     const width = right-left, height = bottom-top;
     if (width <= 0 || height <= 0) return {svg:source, aspect};
+    const inkLeft = (left-original.x) / original.width;
     root.setAttribute("viewBox", `${left} ${top} ${width} ${height}`);
     root.setAttribute("width", `${width}pt`);
     root.setAttribute("height", `${height}pt`);
-    return {svg:new XMLSerializer().serializeToString(root), aspect:width/height};
+    return {svg:new XMLSerializer().serializeToString(root), aspect:width/height, inkLeft};
   } catch {
     return {svg:source, aspect};
   } finally {
@@ -250,32 +381,52 @@ function trimProjectSvg(source) {
   }
 }
 
-function gridPositions(page, count, settings) {
-  const {preset, custom, gapX, gapY} = settings;
-  const autoColumns = Math.ceil(Math.sqrt(count));
-  const format = preset === "custom" ? custom : preset;
-  const [columns, rows] = preset === "auto"
-    ? [autoColumns, Math.ceil(count / autoColumns)]
-    : format.split("x").map(Number);
-  if (count > columns * rows) throw new Error(`当前有 ${count} 个面板，请选择容量更大的网格或自动排版。`);
-
+function gridPositions(page, aspects, {preset, custom, gapX, gapY, uniformPanels = false}) {
   const [width, height] = page.map(cm => cm * 10);
-  const margin = edgeMarginMm;
-  const cellWidth = (width - 2 * margin - (columns - 1) * gapX) / columns;
-  const cellHeight = (height - 2 * margin - (rows - 1) * gapY) / rows;
-  if (cellWidth < .05 * width || cellHeight < .05 * height) {
-    throw new Error("间距过大。请减小间距，或增大画布。");
+  const auto = preset === "auto";
+  const [columns, rowLimit] = auto ? [Math.ceil(Math.sqrt(aspects.length)), Infinity]
+    : (preset === "custom" ? custom : preset).split("x").map(Number);
+  if (aspects.length > columns * rowLimit) {
+    throw new Error(`当前有 ${aspects.length} 个面板，请选择容量更大的网格或自动排版。`);
   }
-  return Array.from({length:count}, (_, index) => ({
-    x: round((margin + index % columns * (cellWidth + gapX)) / width * 100),
-    y: round((margin + Math.floor(index / columns) * (cellHeight + gapY)) / height * 100),
-    w: Math.floor(cellWidth / width * 10000 + 1e-9) / 100,
-    h: Math.floor(cellHeight / height * 10000 + 1e-9) / 100,
-  }));
+  const rows = [];
+  const labelWidthMm = uniformPanels ? 0 : labelSizePt * 1.15 * 25.4 / 72;
+  for (let i = 0; i < aspects.length; i += columns) {
+    const ratios = aspects.slice(i, i+columns);
+    const slots = auto && !uniformPanels ? ratios.length : columns;
+    const cellWidth = (width - 2*edgeMarginMm - (slots-1)*gapX) / slots;
+    if (cellWidth < .05*width) throw new Error("横向间距过大，请减小间距或增大画布。");
+    const contentWidth = cellWidth - Math.min(labelWidthMm, cellWidth*.2875);
+    rows.push({count:ratios.length, width:cellWidth, height:Math.max(...ratios.map(ratio => contentWidth/ratio))});
+  }
+  const gapHeight = 2*edgeMarginMm + (rows.length-1)*gapY;
+  const minimum = .05*height;
+  const needed = rows.reduce((sum, row) => sum+Math.max(row.height, minimum), 0);
+  const available = height-gapHeight;
+  if (available < rows.length*minimum) throw new Error("纵向间距过大，请减小间距或增大画布。");
+  const scale = needed > available && needed > rows.length*minimum
+    ? (available-rows.length*minimum)/(needed-rows.length*minimum) : 1;
+  let top = edgeMarginMm;
+  return rows.flatMap(row => {
+    const rowHeight = minimum + Math.max(0, row.height-minimum)*scale;
+    const y = round(100*top/height);
+    top += rowHeight+gapY;
+    return Array.from({length:row.count}, (_, column) => ({
+      x:round(100*(edgeMarginMm+column*(row.width+gapX))/width), y,
+      w:Math.floor(row.width/width*10000+1e-9)/100,
+      h:Math.floor(rowHeight/height*10000+1e-9)/100,
+    }));
+  });
 }
 
 function arrangePanels(settings) {
-  const positions = gridPositions(layout.page, layout.panels.length, settings);
+  const preview = [...$("canvas").querySelectorAll(".panel img")];
+  const properties = layout.panels.map(panel => {
+    const source = panel.photo || panelImage(panel)?.url;
+    const image = preview.find(item => item.getAttribute("src") === source);
+    return panelAspect(panel) || (image?.naturalWidth / image?.naturalHeight) || 1.618;
+  });
+  const positions = gridPositions(layout.page, properties, {...settings, uniformPanels:layout.uniformPanels});
   layout.panels.forEach((panel, index) => box(panel, positions[index]));
 }
 
@@ -329,25 +480,27 @@ function svgNode(name, attrs) {
 function combinedSvg() {
   const [w, h] = pagePoints();
   const boxes = layout.panels.map(panel => {
-    const frame = panelFrame(panel.w*w/100, panel.h*h/100, images.get(panel.figure)?.aspect);
+    const frame = chartFrame(panel, panel.w*w/100, panel.h*h/100);
     return {...frame, x:panel.x*w/100+frame.x, y:panel.y*h/100+frame.y};
   });
-  const padding = edgeMarginMm * 72 / 25.4;
+  const marks = boxes.map((frame, index) => panelLabelPosition(frame, layout.panels[index]));
+  const padding = (layout.exportMarginMm ?? edgeMarginMm) * 72 / 25.4;
   const crop = layout.trimExport !== false;
-  const left = crop ? Math.max(0, Math.min(...boxes.map(box => box.x)) - padding) : 0;
-  const top = crop ? Math.max(0, Math.min(...boxes.map(box => box.y-box.band)) - padding) : 0;
-  const right = crop ? Math.min(w, Math.max(...boxes.map(box => box.x+box.width)) + padding) : w;
-  const bottom = crop ? Math.min(h, Math.max(...boxes.map(box => box.y+box.height)) + padding) : h;
+  const leftEdges = boxes.map((box, index) =>
+    box.x+box.width*(panelImage(layout.panels[index])?.inkLeft || 0));
+  const left = crop ? Math.min(...leftEdges, ...marks.map(mark => mark.x)) - padding : 0;
+  const top = crop ? Math.min(...boxes.map(box => box.y)) - padding : 0;
+  const right = crop ? Math.max(...boxes.map(box => box.x+box.width)) + padding : w;
+  const bottom = crop ? Math.max(...boxes.map(box => box.y+box.height)) + padding : h;
   const width = right-left, height = bottom-top;
   const cm = value => (value * 2.54 / 72).toFixed(3);
   const root = svgNode("svg", {width:`${cm(width)}cm`, height:`${cm(height)}cm`,
     viewBox:`${left} ${top} ${width} ${height}`});
   root.append(svgNode("rect", {x:left, y:top, width, height, fill:"white"}));
   layout.panels.forEach((panel, index) => {
-    const {band, labelSize, ...size} = boxes[index];
-    const {x, y} = size;
+    const {gutter, labelSize, ...size} = boxes[index];
     if (panel.figure) {
-      const source = images.get(panel.figure)?.svg;
+      const source = panelImage(panel)?.svg;
       if (!source) throw new Error(`无法导出：${panel.title} 的预览尚未载入`);
       const child = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
       const prefix = `panel${index}-`;
@@ -363,13 +516,18 @@ function combinedSvg() {
         }
       });
       Object.entries(size).forEach(([key, value]) => child.setAttribute(key, value));
+      child.setAttribute("overflow", "visible");
       root.append(child);
     } else if (panel.photo) {
-      root.append(svgNode("image", {...size, href:panel.photo, preserveAspectRatio:"xMidYMid meet"}));
+      const photo = photos.get(panel.id);
+      if (layout.trimPhotos !== false && photo?.source === panel.photo && photo.cropHeight < photo.height)
+        root.append(photoSvg(photo, size));
+      else root.append(svgNode("image", {...size, href:panel.photo, preserveAspectRatio:"xMidYMid meet"}));
     } else {
       throw new Error("请先填入或移除占位面板，再导出");
     }
-    const label = svgNode("text", {x, y:y-band+labelSize, "font-size":labelSize,
+    const mark = marks[index];
+    const label = svgNode("text", {x:mark.x, y:mark.y+labelSize*.8, "font-size":labelSize,
       "font-weight":"bold", "font-family":"Arial,sans-serif"});
     label.textContent = panelLetter(index);
     root.append(label);
@@ -493,8 +651,31 @@ async function start() {
   $("gridGapX").value = grid.gapX;
   $("gridGapY").value = grid.gapY;
   $("trimExport").checked = layout.trimExport !== false;
+  $("trimPhotos").checked = layout.trimPhotos !== false;
+  $("uniformPanels").checked = !!layout.uniformPanels;
+  $("uniformPanels").onchange = () => {
+    layout.uniformPanels = $("uniformPanels").checked;
+    markChanged();
+    refreshImages();
+  };
+  $("trimPhotos").onchange = () => {
+    layout.trimPhotos = $("trimPhotos").checked;
+    markChanged(); draw();
+  };
+  $("exportMargin").value = layout.exportMarginMm ?? edgeMarginMm;
   $("trimExport").onchange = () => {
     layout.trimExport = $("trimExport").checked;
+    markChanged();
+    syncFields();
+  };
+  $("exportMargin").onchange = () => {
+    const value = $("exportMargin").valueAsNumber;
+    if (!Number.isFinite(value) || value < 0) {
+      $("exportMargin").value = layout.exportMarginMm ?? edgeMarginMm;
+      status("请输入大于或等于 0 的导出白边。");
+      return;
+    }
+    layout.exportMarginMm = value;
     markChanged();
   };
   available = settings.ai;
@@ -552,8 +733,16 @@ async function start() {
   $("replace").onclick = () => {
     const panel = layout.panels.find(item => item.id === selected);
     delete panel.photo;
+    delete panel.hideLegend;
     Object.assign(panel, chosenFigure());
     markChanged(); draw(); refreshImages();
+  };
+  $("hidePanelLegend").onchange = () => {
+    const panel = layout.panels.find(item => item.id === selected);
+    if (!panel?.figure || draft) return;
+    panel.hideLegend = $("hidePanelLegend").checked;
+    markChanged();
+    refreshImages();
   };
   $("remove").onclick = () => {
     layout.panels = layout.panels.filter(item => item.id !== selected);

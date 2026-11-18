@@ -10,6 +10,8 @@
 <label>字体<select id="font"><option>Arial</option><option>Times New Roman</option><option>DejaVu Sans</option></select></label>
 <div class="pair"><label>画布宽（cm）<input id="w_cm" type="number" min="3" max="30" step=".1"></label><label>画布高（cm）<input id="h_cm" type="number" min="3" max="30" step=".1"></label></div>
 <div class="pair"><label>轴标题（pt）<input id="title_pt" type="number" min="1" max="36" step=".5"></label><label>刻度与图例（pt）<input id="tick_pt" type="number" min="1" max="36" step=".5"></label></div>
+<label>轴标题字重<select id="axis_title_weight"><option value="normal">常规</option><option value="bold">加粗</option></select></label>
+<label>图中文字字重<select id="font_weight"><option value="normal">常规</option><option value="bold">全部加粗</option></select></label>
 <div class="pair"><label>坐标轴<select id="spines"><option value="left_bottom">左轴和下轴</option><option value="all">四边框</option></select></label><label>刻度方向<select id="tick_dir"><option value="out">朝外</option><option value="in">朝内</option></select></label></div>
 <div class="pair"><label>线宽（pt）<input id="line_width_pt" type="number" min=".1" max="10" step=".1"></label><label>绘图区左距（%）<input id="left" type="number" min="1" max="99"></label></div>
 <div class="pair"><label>绘图区上距（%）<input id="top" type="number" min="1" max="99"></label><label>绘图区宽（%）<input id="width" type="number" min="1" max="99"></label></div>
@@ -20,9 +22,11 @@
 </main><script>
 const $=id=>document.getElementById(id);
 let state, template;
-const groups={page:['w_cm','h_cm'],layer:['left','top','width','height'],style:['title_pt','tick_pt','line_width_pt','font','spines','tick_dir']};
+const groups={page:['w_cm','h_cm'],layer:['left','top','width','height'],style:['title_pt','tick_pt','line_width_pt','font','spines','tick_dir','axis_title_weight','font_weight']};
 function populate(value){
   template=structuredClone(value);
+  template.style.axis_title_weight ??= 'normal';
+  template.style.font_weight ??= 'normal';
   for(const [group,keys] of Object.entries(groups))for(const key of keys)$(key).value=template[group][key];
   $('colors').replaceChildren();
   for(const color of template.palette.slice(0,4)){const input=document.createElement('input');input.type='color';input.value=color;input.setAttribute('aria-label','曲线颜色');input.oninput=draw;$('colors').append(input);}
@@ -30,7 +34,7 @@ function populate(value){
 }
 function collect(){
   const result=structuredClone(template);
-  for(const [group,keys] of Object.entries(groups))for(const key of keys)result[group][key]=['font','spines','tick_dir'].includes(key)?$(key).value:Number($(key).value);
+  for(const [group,keys] of Object.entries(groups))for(const key of keys)result[group][key]=$(key).tagName==='SELECT'?$(key).value:Number($(key).value);
   result.palette=[...$('colors').children].map(input=>input.value).concat(template.palette.slice(4));
   return result;
 }
@@ -44,10 +48,11 @@ function draw(){
   c.strokeStyle='#666';c.lineWidth=1.5;c.beginPath();c.moveTo(x,y);c.lineTo(x,y+h);c.lineTo(x+w,y+h);if(t.style.spines==='all'){c.lineTo(x+w,y);c.lineTo(x,y)}c.stroke();
   c.save();c.beginPath();c.rect(x,y,w,h);c.clip();
   t.palette.slice(0,4).forEach((color,i)=>{c.strokeStyle=color;c.lineWidth=t.style.line_width_pt*pt;c.beginPath();for(let j=0;j<=300;j++){const xx=j/300,yy=(.22+.13*i)*Math.exp(-(((xx-.47)/.16)**2));const px=x+xx*w,py=y+h-yy*h;j?c.lineTo(px,py):c.moveTo(px,py)}c.stroke()});c.restore();
-  c.fillStyle='#222';c.font=`${t.style.tick_pt*pt}px "${t.style.font}"`;c.textAlign='center';
+  c.fillStyle='#222';c.font=`${t.style.font_weight} ${t.style.tick_pt*pt}px "${t.style.font}"`;c.textAlign='center';
   const tick=t.style.tick_dir==='out'?6:-6;
   for(let i=0;i<=2;i++){const xx=x+i*w/2;c.beginPath();c.moveTo(xx,y+h);c.lineTo(xx,y+h+tick);c.strokeStyle='#666';c.stroke();c.fillText(String(i),xx,y+h+t.style.tick_pt*pt+9)}
-  c.font=`${t.style.title_pt*pt}px "${t.style.font}"`;c.fillText('Potential (V)',x+w/2,y+h+t.style.tick_pt*pt+t.style.title_pt*pt+13);
+  const titleWeight=t.style.font_weight==='bold'?'bold':t.style.axis_title_weight;
+  c.font=`${titleWeight} ${t.style.title_pt*pt}px "${t.style.font}"`;c.fillText('Potential (V)',x+w/2,y+h+t.style.tick_pt*pt+t.style.title_pt*pt+13);
   c.save();c.translate(x-45,y+h/2);c.rotate(-Math.PI/2);c.fillText('Current (nA)',0,0);c.restore();
 }
 for(const keys of Object.values(groups))for(const key of keys)$(key).oninput=draw;
