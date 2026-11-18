@@ -461,7 +461,6 @@
 
     <section>
       <h3>备注</h3>
-      <p id="figureMethodNote" class="note" hidden></p>
       <textarea id="figureNote" aria-label="图件备注" rows="3" maxlength="4000" placeholder="记录数据来源、处理方法或排版说明" style="width:100%;resize:vertical"></textarea>
       <div class="row"><button id="saveFigureNote">保存备注</button></div>
     </section>
@@ -1108,10 +1107,6 @@ function fillLayer(){
     editor.defaultValue = savedNote;
     editor.value = savedNote;
   }
-  const error = s.data?.fscv_peak_bar?.illustrative_error_nA;
-  const methodNote = $('figureMethodNote');
-  methodNote.hidden = !(error > 0);
-  methodNote.textContent = error > 0 ? `误差棒为 ±${error.toFixed(2)} nA 的示意值，未由重复实验估计。` : '';
   $('axTitleX').value = s.axis.x_title;
   $('axTitleY').value = s.axis.y_title;
   const box = $('objList'); box.innerHTML = '';

@@ -26,9 +26,6 @@ def revision_info(figure):
     files = [paths.spec_file(figure), paths.absolute(spec["data"]["working_csv"])]
     revision = hashlib.sha256(b"".join(Path(file).read_bytes() for file in files)).hexdigest()
     notes = [spec["note"]] if spec.get("note") else []
-    error = spec["data"].get("fscv_peak_bar", {}).get("illustrative_error_nA", 0)
-    if error:
-        notes.append(f"误差棒为 ±{error:.2f} nA 的示意值，未由重复实验估计。")
     return {"revision": revision, "notes": notes}
 
 
