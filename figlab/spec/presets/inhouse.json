@@ -1,9 +1,9 @@
 {
   "name": "inhouse",
-  "label": "组内科研图 · 湖蓝玫红紫（默认）",
+  "label": "Nature 单栏参考 · 黄金比例",
   "page": {
-    "w_cm": 8.0,
-    "h_cm": 6.0
+    "w_cm": 8.9,
+    "h_cm": 5.5
   },
   "layer": {
     "left": 20.0,
@@ -13,17 +13,17 @@
   },
   "style": {
     "font": "Arial",
-    "tick_pt": 8.5,
-    "title_pt": 11.5,
+    "tick_pt": 6.5,
+    "title_pt": 7,
     "axis_title_weight": "normal",
     "spines": "left_bottom",
     "tick_dir": "out",
     "grid": false,
     "equal_aspect": false,
     "fill_frame": true,
-    "line_width_pt": 1.5,
+    "line_width_pt": 0.9,
     "marker_size_pt": 3.8,
-    "frame_line_width_pt": 0.65,
+    "frame_line_width_pt": 0.5,
     "ms_focus_fit": true,
     "break_gaps": true,
     "connect": "segment"
@@ -43,10 +43,10 @@
     "zero_origin": false
   },
   "palette": [
-    "#267EA0",
-    "#B5467A",
-    "#6745A0",
     "#F5C46F",
+    "#DBB2FF",
+    "#628CBB",
+    "#C0688B",
     "#397B76",
     "#8A6D9B",
     "#A66345",
@@ -68,5 +68,5 @@
       "pdf"
     ]
   },
-  "note": "8×6 cm；Arial，轴标题 11.5 pt，刻度和图例 8.5 pt；细灰左下轴，刻度朝外。图例与结果小表按数据留白摆放。"
+  "note": "89×55 mm，黄金比例约 1.618；Arial 轴标题 7 pt，刻度与图例 6.5 pt，曲线 0.9 pt，细灰左下轴。四浓度从内到外金黄、淡紫、钢蓝、玫红，按数据幅度与留白安排图例和结果表。"
 }

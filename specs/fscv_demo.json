@@ -3,8 +3,8 @@
   "preset": "inhouse",
   "overrides": {
     "page": {
-      "w_cm": 8,
-      "h_cm": 6
+      "w_cm": 8.9,
+      "h_cm": 5.5
     },
     "layer": {
       "height": 70,
@@ -27,14 +27,21 @@
       ]
     },
     "style": {
-      "tick_pt": 8.5,
-      "title_pt": 11.5,
-      "frame_line_width_pt": 0.65,
       "font": "Arial",
-      "line_width_pt": 1.5,
+      "tick_pt": 6.5,
+      "title_pt": 7,
       "axis_title_weight": "normal",
       "spines": "left_bottom",
       "tick_dir": "out",
+      "grid": false,
+      "equal_aspect": false,
+      "fill_frame": true,
+      "line_width_pt": 0.9,
+      "marker_size_pt": 3.8,
+      "frame_line_width_pt": 0.5,
+      "ms_focus_fit": true,
+      "break_gaps": true,
+      "connect": "scatter",
       "fscv_peak_table_curve": "DA 2.00 μM"
     },
     "axis": {
@@ -63,7 +70,7 @@
         "letter": "a",
         "name": "0.75 μM",
         "annot_text": "a",
-        "color": "#267EA0",
+        "color": "#F5C46F",
         "marker": "circle",
         "include": true,
         "annot_dx_pt": 7,
@@ -77,7 +84,7 @@
         "letter": "b",
         "name": "1.00 μM",
         "annot_text": "b",
-        "color": "#B5467A",
+        "color": "#DBB2FF",
         "marker": "square",
         "include": true,
         "annot_dx_pt": 7,
@@ -91,7 +98,7 @@
         "letter": "c",
         "name": "1.50 μM",
         "annot_text": "c",
-        "color": "#6745A0",
+        "color": "#628CBB",
         "marker": "triangle_up",
         "include": true,
         "annot_dx_pt": 7,
@@ -105,7 +112,7 @@
         "letter": "d",
         "name": "2.00 μM",
         "annot_text": "d",
-        "color": "#F5C46F",
+        "color": "#C0688B",
         "marker": "triangle_down",
         "include": true,
         "annot_dx_pt": 7,
@@ -135,8 +142,8 @@
     ]
   },
   "page": {
-    "w_cm": 8,
-    "h_cm": 6
+    "w_cm": 8.9,
+    "h_cm": 5.5
   },
   "layer": {
     "left": 20,
@@ -146,20 +153,20 @@
   },
   "style": {
     "font": "Arial",
-    "tick_pt": 8.5,
-    "title_pt": 11.5,
+    "tick_pt": 6.5,
+    "title_pt": 7,
     "axis_title_weight": "normal",
     "spines": "left_bottom",
     "tick_dir": "out",
     "grid": false,
     "equal_aspect": false,
     "fill_frame": true,
-    "line_width_pt": 1.5,
+    "line_width_pt": 0.9,
     "marker_size_pt": 3.8,
-    "frame_line_width_pt": 0.65,
+    "frame_line_width_pt": 0.5,
     "ms_focus_fit": true,
     "break_gaps": true,
-    "connect": "segment",
+    "connect": "scatter",
     "fscv_peak_table_curve": "DA 2.00 μM"
   },
   "axis": {
@@ -182,7 +189,7 @@
       "letter": "a",
       "name": "0.75 μM",
       "annot_text": "a",
-      "color": "#267EA0",
+      "color": "#F5C46F",
       "marker": "circle",
       "include": true,
       "annot_dx_pt": 7,
@@ -196,7 +203,7 @@
       "letter": "b",
       "name": "1.00 μM",
       "annot_text": "b",
-      "color": "#B5467A",
+      "color": "#DBB2FF",
       "marker": "square",
       "include": true,
       "annot_dx_pt": 7,
@@ -210,7 +217,7 @@
       "letter": "c",
       "name": "1.50 μM",
       "annot_text": "c",
-      "color": "#6745A0",
+      "color": "#628CBB",
       "marker": "triangle_up",
       "include": true,
       "annot_dx_pt": 7,
@@ -224,7 +231,7 @@
       "letter": "d",
       "name": "2.00 μM",
       "annot_text": "d",
-      "color": "#F5C46F",
+      "color": "#C0688B",
       "marker": "triangle_down",
       "include": true,
       "annot_dx_pt": 7,
