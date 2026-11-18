@@ -75,6 +75,11 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     ck(os.path.isfile(paths.absolute(wcsv)) if wcsv.strip() else False,
        "data.working_csv 不存在（相对路径按项目根解析）：%s" % wcsv)
     ck(isinstance(data.get("only_included"), bool), "data.only_included 必须是布尔")
+    if "break_before_point" in data:
+        breaks = data["break_before_point"]
+        ck(data.get("spectrum") == "fscv" and isinstance(breaks, list)
+           and all(type(index) is int and index > 1 for index in breaks),
+           "break_before_point 必须是 FSCV 断线处的点序列表")
     tail = data.get("tail_ohm", 0)
     ck(_num(tail) is not None and float(tail or 0) >= 0,
        "data.tail_ohm 必须是 >=0 的数值（固定欧姆数截尾，禁止固定比例）")
@@ -118,8 +123,9 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
         ck(v is not None and v > 0, "style.%s 必须是正数" % k)
     v = _num(st.get("line_width_pt"))
     ck(v is not None and v >= 0, "style.line_width_pt 必须 >= 0")
-    ck(st.get("spines") == "all", "坐标框四边必须全画（spines='all'）")
-    ck(st.get("tick_dir") == "in", "刻度必须朝内（tick_dir='in'）")
+    open_axes = st.get("spines") == "left_bottom"
+    ck(st.get("spines") == "all" or open_axes, "坐标轴可选四边框或左下轴")
+    ck(st.get("tick_dir") in ("in", "out"), "刻度方向须为 in 或 out")
     ck(st.get("grid") is False, "默认无网格（grid=false）")
     ck(isinstance(st.get("ms_frequency_key", False), bool), "ms_frequency_key 必须是布尔")
     ck(st.get("axis_title_weight", "normal") in ("normal", "bold"),
@@ -204,6 +210,15 @@ def validate(spec: dict, curves: set[str] | None = None) -> dict:
     ck(len(set(markers)) >= 1, "未指定任何符号")
     if len(series) > 6:
         warnings.append("曲线数 %d > 6：配色可能重复，缩印后可分辨性下降" % len(series))
+    if "fscv_peak_table_curve" in st:
+        boundary = data.get("break_before_point")
+        ck(data.get("spectrum") == "fscv" and isinstance(boundary, list) and len(boundary) == 1
+           and isinstance(st["fscv_peak_table_curve"], str)
+           and any(s.get("curve") == st["fscv_peak_table_curve"] for s in series),
+           "FSCV 峰值表需要指定曲线和一个正扫/回扫分界点")
+    if data.get("spectrum") == "fscv" and "loc" in spec.get("legend", {}):
+        ck(spec["legend"]["loc"] in ("upper left", "upper right"),
+           "FSCV 图例位置必须是 upper left 或 upper right")
     if spec.get("legend", {}).get("show") is not False:
         ck(False, "默认不用图例框，曲线身份用末端同色单字母（规范 §三.6）")
 

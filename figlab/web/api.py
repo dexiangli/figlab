@@ -154,17 +154,26 @@ def figure_list() -> list[dict]:
 
 
 def add_figure(fig_id: str, preset: str = "inhouse",
-               dataset: str = "eis_20261107", folder: str = "") -> dict:
+               dataset: str = "", folder: str = "") -> dict:
     if not fig_id or not re.fullmatch(r"[A-Za-z0-9_\-]+", fig_id):
         return {"ok": False, "error": "图 ID 只能用字母数字下划线连字符"}
     if os.path.isfile(paths.spec_file(fig_id)):
         return {"ok": False, "error": "窗口 ID 已存在"}
     if preset not in PRESET_NAMES:
         return {"ok": False, "error": "未知预设"}
-    rows = read_long(paths.working(dataset), "eis")
+    dataset = dataset or ("fscv_demo" if os.path.isfile(paths.working("fscv_demo")) else "eis_20261107")
+    with open(paths.raw_meta(dataset), encoding="utf-8") as handle:
+        spectrum = json.load(handle).get("spectrum", "eis")
+    rows = read_long(paths.working(dataset), spectrum)
     curves = sorted({r["curve"] for r in rows})
+    overrides = None
+    if dataset == "fscv_demo":
+        sample = load_spec("fscv_demo")
+        overrides = {"data": {"break_before_point": [1502]}, "axis": sample["axis"],
+                     "style": {"fscv_peak_table_curve": "DA 2.00 μM"}}
     spec = build_spec(fig_id, dataset, curves, preset=preset,
-                      note="由网页新建；使用默认预设", tail_ohm=60.0)
+                      note="由网页新建；使用个人默认风格", tail_ohm=60.0,
+                      spectrum=spectrum, overrides=overrides)
     save_spec(spec)
     if folder:
         project.move_figure(fig_id, folder)

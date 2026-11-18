@@ -204,7 +204,7 @@ def snapshot() -> dict:
                 item["spectrum_label"] = ("组图" if spec.get("kind") == "board"
                                           else "Tauc" if spec.get("data", {}).get("view") == "tauc_preview"
                                           else {"eis": "阻抗", "mott_schottky": "MS", "uvvis": "UV–Vis",
-                                                "photothermal": "光热"}.get(spectrum, "图"))
+                                                "photothermal": "光热", "fscv": "FSCV"}.get(spectrum, "图"))
                 item["base"] = spec.get("export", {}).get("base", "")
                 item["n_curves"] = sum(1 for s in spec.get("series", [])
                                        if s.get("include", True))

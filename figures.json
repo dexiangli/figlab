@@ -1,29 +1,21 @@
 {
   "figures": [
     {
-      "id": "eis_wide",
       "preset": "inhouse",
-      "spec": "specs/eis_wide.json",
       "folder": "f_default",
-      "title": "eis_wide",
-      "order": 27
-    },
-    {
-      "id": "eis_main",
-      "preset": "inhouse",
-      "spec": "specs/eis_main.json",
-      "folder": "f_default",
-      "title": "eis_main",
-      "order": 3
+      "order": 1,
+      "id": "fscv_demo",
+      "title": "多巴胺 FSCV · 浓度系列",
+      "spec": "specs/fscv_demo.json"
     }
   ],
+  "version": 2,
   "folders": [
     {
-      "id": "f_default",
-      "name": "Folder1",
+      "name": "FSCV 示例",
       "open": true,
-      "order": 1
+      "order": 1,
+      "id": "f_default"
     }
-  ],
-  "version": 2
+  ]
 }

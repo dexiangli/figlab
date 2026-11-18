@@ -11,6 +11,7 @@ from __future__ import annotations
 COMMON = ["curve", "point_index", "include", "note"]
 
 SPECTRUM_COLUMNS = {
+    "fscv": ["curve", "point_index", "potential_V", "current_nA", "include", "note"],
     "uvvis": ["curve", "point_index", "wavelength_nm", "absorbance", "include", "note"],
     # 规范 §一.5：曲线名、点序、频率、实部、虚部、参与标记、备注
     "eis": ["curve", "point_index", "freq_Hz", "Zp_ohm", "Zpp_ohm", "include", "note"],
@@ -21,6 +22,7 @@ SPECTRUM_COLUMNS = {
 }
 
 NUMERIC_COLUMNS = {
+    "fscv": ["potential_V", "current_nA"],
     "uvvis": ["wavelength_nm", "absorbance"],
     "eis": ["freq_Hz", "Zp_ohm", "Zpp_ohm"],
     "photothermal": ["time_s", "temp_C"],

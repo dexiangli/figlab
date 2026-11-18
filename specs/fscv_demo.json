@@ -1,0 +1,253 @@
+{
+  "id": "fscv_demo",
+  "preset": "inhouse",
+  "overrides": {
+    "page": {
+      "w_cm": 8,
+      "h_cm": 6
+    },
+    "layer": {
+      "height": 70,
+      "width": 70,
+      "top": 10,
+      "left": 20
+    },
+    "data": {
+      "dataset": "fscv_demo",
+      "spectrum": "fscv",
+      "working_csv": "datasets/fscv_demo/working.csv",
+      "x": "potential_V",
+      "y": "current_nA",
+      "only_included": true,
+      "tail_ohm": 60.0,
+      "fit_arc": false,
+      "fit_disclaimer": "",
+      "break_before_point": [
+        1502
+      ]
+    },
+    "style": {
+      "tick_pt": 8.5,
+      "title_pt": 11.5,
+      "frame_line_width_pt": 0.65,
+      "font": "Arial",
+      "line_width_pt": 1.5,
+      "axis_title_weight": "normal",
+      "spines": "left_bottom",
+      "tick_dir": "out",
+      "fscv_peak_table_curve": "DA 2.00 μM"
+    },
+    "axis": {
+      "y_inc": 5,
+      "y_to": 20.8,
+      "x_from": -0.43,
+      "x_inc": 1,
+      "x_to": 1.02,
+      "y_from": -12.1,
+      "auto_from_data": false
+    },
+    "export": {
+      "dir": "outputs/fscv_demo",
+      "base": "FSCV_DA_demo",
+      "name_suffix": "",
+      "name_date": "20261117",
+      "auto_name": false,
+      "dpi": 600,
+      "formats": [
+        "pdf"
+      ]
+    },
+    "series": [
+      {
+        "curve": "DA 0.75 μM",
+        "letter": "a",
+        "name": "0.75 μM",
+        "annot_text": "a",
+        "color": "#267EA0",
+        "marker": "circle",
+        "include": true,
+        "annot_dx_pt": 7,
+        "annot_dy_pt": 0,
+        "annot_locked": false,
+        "off_x": 0,
+        "off_y": 0
+      },
+      {
+        "curve": "DA 1.00 μM",
+        "letter": "b",
+        "name": "1.00 μM",
+        "annot_text": "b",
+        "color": "#B5467A",
+        "marker": "square",
+        "include": true,
+        "annot_dx_pt": 7,
+        "annot_dy_pt": 0,
+        "annot_locked": false,
+        "off_x": 0,
+        "off_y": 0
+      },
+      {
+        "curve": "DA 1.50 μM",
+        "letter": "c",
+        "name": "1.50 μM",
+        "annot_text": "c",
+        "color": "#6745A0",
+        "marker": "triangle_up",
+        "include": true,
+        "annot_dx_pt": 7,
+        "annot_dy_pt": 0,
+        "annot_locked": false,
+        "off_x": 0,
+        "off_y": 0
+      },
+      {
+        "curve": "DA 2.00 μM",
+        "letter": "d",
+        "name": "2.00 μM",
+        "annot_text": "d",
+        "color": "#F5C46F",
+        "marker": "triangle_down",
+        "include": true,
+        "annot_dx_pt": 7,
+        "annot_dy_pt": 0,
+        "annot_locked": false,
+        "off_x": 0,
+        "off_y": 0
+      }
+    ],
+    "legend": {
+      "loc": "upper left"
+    }
+  },
+  "note": "Public figure source data, Berger et al., Analytical Chemistry 2025, DOI 10.1021/acs.analchem.5c03599; Zenodo 10.5281/zenodo.17154734, CC-BY-4.0. Figure 1C DA series; scan break before point 1502.",
+  "data": {
+    "dataset": "fscv_demo",
+    "spectrum": "fscv",
+    "working_csv": "datasets/fscv_demo/working.csv",
+    "x": "potential_V",
+    "y": "current_nA",
+    "only_included": true,
+    "tail_ohm": 60.0,
+    "fit_arc": false,
+    "fit_disclaimer": "",
+    "break_before_point": [
+      1502
+    ]
+  },
+  "page": {
+    "w_cm": 8,
+    "h_cm": 6
+  },
+  "layer": {
+    "left": 20,
+    "top": 10,
+    "width": 70,
+    "height": 70
+  },
+  "style": {
+    "font": "Arial",
+    "tick_pt": 8.5,
+    "title_pt": 11.5,
+    "axis_title_weight": "normal",
+    "spines": "left_bottom",
+    "tick_dir": "out",
+    "grid": false,
+    "equal_aspect": false,
+    "fill_frame": true,
+    "line_width_pt": 1.5,
+    "marker_size_pt": 3.8,
+    "frame_line_width_pt": 0.65,
+    "ms_focus_fit": true,
+    "break_gaps": true,
+    "connect": "segment",
+    "fscv_peak_table_curve": "DA 2.00 μM"
+  },
+  "axis": {
+    "x_title": "Potential (V)",
+    "y_title": "Current (nA)",
+    "x_from": -0.43,
+    "x_to": 1.02,
+    "x_inc": 1,
+    "y_from": -12.1,
+    "y_to": 20.8,
+    "y_inc": 5,
+    "auto_from_data": false,
+    "pad_frac": 0.05,
+    "snap_to_tick": true,
+    "zero_origin": false
+  },
+  "series": [
+    {
+      "curve": "DA 0.75 μM",
+      "letter": "a",
+      "name": "0.75 μM",
+      "annot_text": "a",
+      "color": "#267EA0",
+      "marker": "circle",
+      "include": true,
+      "annot_dx_pt": 7,
+      "annot_dy_pt": 0,
+      "annot_locked": false,
+      "off_x": 0,
+      "off_y": 0
+    },
+    {
+      "curve": "DA 1.00 μM",
+      "letter": "b",
+      "name": "1.00 μM",
+      "annot_text": "b",
+      "color": "#B5467A",
+      "marker": "square",
+      "include": true,
+      "annot_dx_pt": 7,
+      "annot_dy_pt": 0,
+      "annot_locked": false,
+      "off_x": 0,
+      "off_y": 0
+    },
+    {
+      "curve": "DA 1.50 μM",
+      "letter": "c",
+      "name": "1.50 μM",
+      "annot_text": "c",
+      "color": "#6745A0",
+      "marker": "triangle_up",
+      "include": true,
+      "annot_dx_pt": 7,
+      "annot_dy_pt": 0,
+      "annot_locked": false,
+      "off_x": 0,
+      "off_y": 0
+    },
+    {
+      "curve": "DA 2.00 μM",
+      "letter": "d",
+      "name": "2.00 μM",
+      "annot_text": "d",
+      "color": "#F5C46F",
+      "marker": "triangle_down",
+      "include": true,
+      "annot_dx_pt": 7,
+      "annot_dy_pt": 0,
+      "annot_locked": false,
+      "off_x": 0,
+      "off_y": 0
+    }
+  ],
+  "legend": {
+    "show": false,
+    "loc": "upper left"
+  },
+  "texts": [],
+  "export": {
+    "dir": "outputs/fscv_demo",
+    "base": "FSCV_DA_demo",
+    "name_suffix": "",
+    "name_date": "20261117",
+    "auto_name": false,
+    "dpi": 600,
+    "formats": [
+      "pdf"
+    ]
+  }
+}

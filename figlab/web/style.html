@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FigLab · 选择绘图风格</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5f7;color:#243447;font:15px Arial,sans-serif}main{max-width:1080px;margin:40px auto;padding:24px}h1{font-size:28px;margin:0 0 12px}p{line-height:1.65}section{background:white;border:1px solid #dbe2e8;border-radius:12px;padding:24px} .layout{display:grid;grid-template-columns:360px 1fr;gap:24px}label{display:block;margin-bottom:12px}input,select{font:inherit;padding:7px;border:1px solid #c7d0d9;border-radius:5px;width:100%}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}button{font:inherit;border:0;border-radius:6px;padding:11px 20px;background:#285b84;color:white;cursor:pointer}a{color:#285b84}canvas{width:100%;height:auto}#colors{display:flex;gap:10px;margin:8px 0 20px}#colors input{width:50px;height:36px;padding:2px}#message{color:#9c3535;min-height:24px}h2{font-size:18px;margin-top:0}@media(max-width:800px){.layout{grid-template-columns:1fr}main{margin:10px auto;padding:15px}}
+</style></head><body><main>
+<h1>选择你的绘图风格</h1>
+<p>首次使用时，先确定字体、配色和画面比例。可以从示例开始，按自己的论文或参考图调整。保存后，新建图默认继承你的选择。顶部「绘图风格」可随时回来调整。</p>
+<div class="layout"><section><label>参考方案<select id="preset"></select></label>
+<label>字体<select id="font"><option>Arial</option><option>Times New Roman</option><option>DejaVu Sans</option></select></label>
+<div class="pair"><label>画布宽（cm）<input id="w_cm" type="number" min="3" max="30" step=".1"></label><label>画布高（cm）<input id="h_cm" type="number" min="3" max="30" step=".1"></label></div>
+<div class="pair"><label>轴标题（pt）<input id="title_pt" type="number" min="1" max="36" step=".5"></label><label>刻度与图例（pt）<input id="tick_pt" type="number" min="1" max="36" step=".5"></label></div>
+<div class="pair"><label>坐标轴<select id="spines"><option value="left_bottom">左轴和下轴</option><option value="all">四边框</option></select></label><label>刻度方向<select id="tick_dir"><option value="out">朝外</option><option value="in">朝内</option></select></label></div>
+<div class="pair"><label>线宽（pt）<input id="line_width_pt" type="number" min=".1" max="10" step=".1"></label><label>绘图区左距（%）<input id="left" type="number" min="1" max="99"></label></div>
+<div class="pair"><label>绘图区上距（%）<input id="top" type="number" min="1" max="99"></label><label>绘图区宽（%）<input id="width" type="number" min="1" max="99"></label></div>
+<label>绘图区高（%）<input id="height" type="number" min="1" max="99"></label>
+<label>曲线配色</label><div id="colors"></div>
+<button id="save">保存为我的默认风格</button><p id="message" role="status"></p><a href="/">返回工作台</a>
+</section><section><h2>样式预览</h2><canvas id="preview" width="900" height="680" aria-label="示例曲线的字体、配色和布局预览"></canvas><p>预览使用示例曲线。真实作图时，根据数据选择坐标范围、图例位置和结果小表。已有图片按各自保存的规格显示。</p><p>组内参考方案采用湖蓝、玫红、紫色。也可以从期刊图件或自己的参考图片中选色，在左侧设置。</p></section></div>
+</main><script>
+const $=id=>document.getElementById(id);
+let state, template;
+const groups={page:['w_cm','h_cm'],layer:['left','top','width','height'],style:['title_pt','tick_pt','line_width_pt','font','spines','tick_dir']};
+function populate(value){
+  template=structuredClone(value);
+  for(const [group,keys] of Object.entries(groups))for(const key of keys)$(key).value=template[group][key];
+  $('colors').replaceChildren();
+  for(const color of template.palette.slice(0,4)){const input=document.createElement('input');input.type='color';input.value=color;input.setAttribute('aria-label','曲线颜色');input.oninput=draw;$('colors').append(input);}
+  draw();
+}
+function collect(){
+  const result=structuredClone(template);
+  for(const [group,keys] of Object.entries(groups))for(const key of keys)result[group][key]=['font','spines','tick_dir'].includes(key)?$(key).value:Number($(key).value);
+  result.palette=[...$('colors').children].map(input=>input.value).concat(template.palette.slice(4));
+  return result;
+}
+function draw(){
+  if(!template)return;
+  const t=collect(),canvas=$('preview'),c=canvas.getContext('2d');
+  canvas.height=Math.round(900*t.page.h_cm/t.page.w_cm);
+  c.fillStyle='white';c.fillRect(0,0,900,canvas.height);
+  const x=900*t.layer.left/100,y=canvas.height*t.layer.top/100,w=900*t.layer.width/100,h=canvas.height*t.layer.height/100;
+  const pt=900/(t.page.w_cm/2.54)/72;
+  c.strokeStyle='#666';c.lineWidth=1.5;c.beginPath();c.moveTo(x,y);c.lineTo(x,y+h);c.lineTo(x+w,y+h);if(t.style.spines==='all'){c.lineTo(x+w,y);c.lineTo(x,y)}c.stroke();
+  c.save();c.beginPath();c.rect(x,y,w,h);c.clip();
+  t.palette.slice(0,4).forEach((color,i)=>{c.strokeStyle=color;c.lineWidth=t.style.line_width_pt*pt;c.beginPath();for(let j=0;j<=300;j++){const xx=j/300,yy=(.22+.13*i)*Math.exp(-(((xx-.47)/.16)**2));const px=x+xx*w,py=y+h-yy*h;j?c.lineTo(px,py):c.moveTo(px,py)}c.stroke()});c.restore();
+  c.fillStyle='#222';c.font=`${t.style.tick_pt*pt}px "${t.style.font}"`;c.textAlign='center';
+  const tick=t.style.tick_dir==='out'?6:-6;
+  for(let i=0;i<=2;i++){const xx=x+i*w/2;c.beginPath();c.moveTo(xx,y+h);c.lineTo(xx,y+h+tick);c.strokeStyle='#666';c.stroke();c.fillText(String(i),xx,y+h+t.style.tick_pt*pt+9)}
+  c.font=`${t.style.title_pt*pt}px "${t.style.font}"`;c.fillText('Potential (V)',x+w/2,y+h+t.style.tick_pt*pt+t.style.title_pt*pt+13);
+  c.save();c.translate(x-45,y+h/2);c.rotate(-Math.PI/2);c.fillText('Current (nA)',0,0);c.restore();
+}
+for(const keys of Object.values(groups))for(const key of keys)$(key).oninput=draw;
+$('preset').onchange=()=>populate(state.presets[$('preset').value]);
+$('save').onclick=async()=>{
+  $('save').disabled=true;
+  try{const t=collect();const response=await fetch('/api/style-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:$('preset').value,page:t.page,layer:t.layer,style:t.style,palette:t.palette})});const result=await response.json();if(!response.ok||result.error)throw Error(result.error||'保存失败');location.href='/';}catch(error){$('message').textContent=error.message;}finally{$('save').disabled=false;}
+};
+(async()=>{try{const response=await fetch('/api/style-settings');state=await response.json();for(const [name,preset]of Object.entries(state.presets)){const option=new Option(preset.label,name);$('preset').add(option)}$('preset').value=state.preset||'inhouse';populate(state.template||state.presets.inhouse);}catch(error){$('message').textContent='读取风格失败：'+error.message;}})();
+</script></body></html>

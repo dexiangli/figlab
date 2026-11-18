@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .. import handoff, paths
 from . import api, board, clipboard
+from ..spec import preferences
 
 UI = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
 
@@ -30,7 +31,7 @@ RENDER_LOCK = threading.RLock()
 HEAVY_GET = {"/api/figure", "/api/reports", "/api/board/preview", "/api/board/revision", "/api/svg"}
 HEAVY_POST = {"/api/point", "/api/workbook", "/api/undo", "/api/redo",
               "/api/spec", "/api/export", "/api/curve-shift", "/api/pptx",
-              "/api/project/open", "/api/board/create", "/api/board/save", "/api/clipboard"}
+              "/api/project/open", "/api/board/create", "/api/board/save", "/api/clipboard", "/api/style-settings"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -68,7 +69,12 @@ class Handler(BaseHTTPRequestHandler):
             if p in ("/", "/index.html"):
                 with open(UI, encoding="utf-8") as fh:
                     return self._send(200, fh.read(), "text/html; charset=utf-8")
-            if p in ("/board.js", "/board.html", "/theme.js", "/theme.css"):
+            if p == "/api/style-settings":
+                from ..spec.merge import load_preset
+                from ..spec.schema import PRESET_NAMES
+                return self._send(200, {**preferences.settings(),
+                                       "presets": {name: load_preset(name) for name in PRESET_NAMES}})
+            if p in ("/board.js", "/board.html", "/theme.js", "/theme.css", "/style.html"):
                 name = p[1:]
                 ctype = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}[os.path.splitext(name)[1]]
                 with open(os.path.join(os.path.dirname(UI), name), encoding="utf-8") as fh:
@@ -149,6 +155,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not 0 <= n <= 64 * 1024 * 1024:
                     return self._send(413, {"error": "文件过大，请分批导入"})
             body = json.loads(self.rfile.read(n) or b"{}")
+            if p == "/api/style-settings":
+                origin = self.headers.get("Origin")
+                if origin and origin != "http://" + self.headers.get("Host", ""):
+                    return self._send(403, {"error": "请在 FigLab 页面内配置"})
+                return self._send(200, preferences.save_settings(body))
             if p == "/api/clipboard":
                 clipboard.copy_svg(board.preview(body["figure"]).encode("utf-8"))
                 return self._send(200, {"ok": True})

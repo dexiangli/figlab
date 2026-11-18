@@ -1,29 +1,29 @@
 {
   "name": "inhouse",
-  "label": "黄金比例 · 组内期刊风格（默认）",
+  "label": "组内科研图 · 湖蓝玫红紫（默认）",
   "page": {
-    "w_cm": 9.708,
+    "w_cm": 8.0,
     "h_cm": 6.0
   },
   "layer": {
-    "left": 17.0,
-    "top": 7.0,
-    "width": 74.0,
-    "height": 74.0
+    "left": 20.0,
+    "top": 10.0,
+    "width": 70.0,
+    "height": 70.0
   },
   "style": {
     "font": "Arial",
-    "tick_pt": 8.0,
-    "title_pt": 9.5,
-    "axis_title_weight": "bold",
-    "spines": "all",
-    "tick_dir": "in",
+    "tick_pt": 8.5,
+    "title_pt": 11.5,
+    "axis_title_weight": "normal",
+    "spines": "left_bottom",
+    "tick_dir": "out",
     "grid": false,
     "equal_aspect": false,
     "fill_frame": true,
-    "line_width_pt": 1.25,
+    "line_width_pt": 1.5,
     "marker_size_pt": 3.8,
-    "frame_line_width_pt": 0.75,
+    "frame_line_width_pt": 0.65,
     "ms_focus_fit": true,
     "break_gaps": true,
     "connect": "segment"
@@ -45,12 +45,12 @@
   "palette": [
     "#267EA0",
     "#B5467A",
-    "#A96608",
-    "#35775D",
-    "#70549A",
-    "#AF4B33",
-    "#51647D",
-    "#226F70"
+    "#6745A0",
+    "#F5C46F",
+    "#397B76",
+    "#8A6D9B",
+    "#A66345",
+    "#566681"
   ],
   "marker_cycle": [
     "circle",
@@ -59,7 +59,8 @@
     "triangle_down"
   ],
   "legend": {
-    "show": false
+    "show": false,
+    "loc": "upper left"
   },
   "export": {
     "dpi": 600,
@@ -67,5 +68,5 @@
       "pdf"
     ]
   },
-  "note": "画布 9.708×6 cm，图框同为约 1.618:1；Arial 轴标题加粗、刻度常规；同色末端标记。"
+  "note": "8×6 cm；Arial，轴标题 11.5 pt，刻度和图例 8.5 pt；细灰左下轴，刻度朝外。图例与结果小表按数据留白摆放。"
 }

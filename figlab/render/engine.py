@@ -25,7 +25,8 @@ import matplotlib.pyplot as plt                     # noqa: E402
 import numpy as np                                  # noqa: E402
 from matplotlib import rcParams                     # noqa: E402
 from matplotlib.colors import to_hex, to_rgb         # noqa: E402
-from matplotlib.ticker import FormatStrFormatter, FuncFormatter  # noqa: E402
+from matplotlib.lines import Line2D                  # noqa: E402
+from matplotlib.ticker import AutoMinorLocator, FormatStrFormatter, FuncFormatter, MultipleLocator  # noqa: E402
 
 from ..data.dataset import read_long                # noqa: E402
 from ..process import get_processor                 # noqa: E402
@@ -219,6 +220,41 @@ def _draw_texts(fig, spec, fonts):
     return out
 
 
+def _draw_fscv_peak_table(ax, plotted, sweep_boundary, table_curve, names, fonts):
+    for curve in plotted:
+        points = curve["points"]
+        forward = (point for point in points if float(point[2]["point_index"]) < sweep_boundary)
+        reverse = (point for point in points if float(point[2]["point_index"]) >= sweep_boundary)
+        oxidation = max(forward, key=lambda point: point[1], default=None)
+        reduction = min(reverse, key=lambda point: point[1], default=None)
+        peaks = [point for point in (oxidation, reduction) if point is not None]
+        ax.plot([point[0] for point in peaks], [point[1] for point in peaks], linestyle="none",
+                marker="o", markersize=3.2, markerfacecolor="white", markeredgecolor=curve["color"],
+                markeredgewidth=.9, zorder=5)
+        if curve["curve"] != table_curve or len(peaks) != 2:
+            continue
+
+        rows = []
+        for label, (_, _, point) in zip(("Ox.", "Red."), peaks):
+            potential = format(float(point["potential_V"]), "+.3f").replace("-", "−")
+            current = format(float(point["current_nA"]), "+.2f").replace("-", "−")
+            rows.append([label, potential, current])
+        ax.text(.56, .31, names[table_curve], transform=ax.transAxes, va="bottom",
+                fontsize=6.7, fontfamily=fonts, color="#35404A")
+        table = ax.table(cellText=rows, colLabels=["Peak", "V", "nA"], cellLoc="right",
+                         colLoc="right", colWidths=[.31, .31, .38], bbox=[.55, .045, .43, .245])
+        table.auto_set_font_size(False)
+        table.set_fontsize(6.7)
+        for (row, column), cell in table.get_celld().items():
+            cell.set_edgecolor("#B9C2CB")
+            cell.set_linewidth(.45)
+            cell.visible_edges = "B" if row == 0 else ""
+            cell.get_text().set_color("#35404A")
+            cell.get_text().set_fontfamily(fonts)
+            if column == 0:
+                cell.get_text().set_ha("left")
+
+
 def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     """lock_axis=True 时坐标范围只按**未平移**的实测点算。
 
@@ -246,6 +282,8 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
 
     proc = get_processor(spectrum)
     is_ms = spectrum == "mott_schottky"
+    is_fscv = spectrum == "fscv"
+    open_axes = st["spines"] == "left_bottom"
     is_uvvis = spectrum == "uvvis"
     is_tauc = is_uvvis and data.get("view") == "tauc_preview"
     if is_ms:
@@ -261,6 +299,9 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         else:
             def coordinates(row):
                 return float(row["wavelength_nm"]), float(row["absorbance"])
+    elif is_fscv:
+        def coordinates(row):
+            return float(row["potential_V"]), float(row["current_nA"])
     else:
         def coordinates(row):
             return float(row["Zp_ohm"]), -float(row["Zpp_ohm"])
@@ -292,7 +333,19 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
         oy = float(s.get("off_y") or 0.0)
         pts = [(x + ox, y + oy, r) for r in kept for x, y in [coordinates(r)]]
         # 被排除（框选删掉）的点在 Z' 轴上的位置：夹在两点之间就说明这里断开了
-        if is_uvvis:
+        if is_fscv:
+            breaks = sorted(data.get("break_before_point", []))
+            excluded = sorted(float(r["point_index"]) for r, inc in pairs if not inc)
+            runs = []
+            previous = None
+            for point in pts:
+                index = float(point[2]["point_index"])
+                if (previous is None or bisect.bisect_right(breaks, previous) < bisect.bisect_right(breaks, index)
+                        or (break_gaps and bisect.bisect_right(excluded, previous) < bisect.bisect_left(excluded, index))):
+                    runs.append([])
+                runs[-1].append(point)
+                previous = index
+        elif is_uvvis:
             excl_z = sorted(coordinates(r)[0] + ox for r, inc in pairs
                             if not inc or (is_tauc and float(r["absorbance"]) < 0))
         elif is_ms:
@@ -300,7 +353,8 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                             if not inc or float(r["Zpp_ohm"]) >= 0)
         else:
             excl_z = sorted(float(r["Zp_ohm"]) + ox for r, inc in pairs if not inc)
-        runs = split_runs(pts, excl_z) if break_gaps else [pts]
+        if not is_fscv:
+            runs = split_runs(pts, excl_z) if break_gaps else [pts]
         reference = s.get("reference", False)
         color = to_hex(0.58 * np.array(to_rgb(s["color"])) + 0.42) if reference else s["color"]
         plotted.append({"curve": c, "letter": s["letter"], "color": color, "reference": reference,
@@ -420,6 +474,8 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
             pd["n_line_pts"] += len(xy)
     # 点少的曲线后画，减少被平行重复曲线整段压住的机会（不改数据、不改点序）
     for pd in sorted(plotted, key=lambda d: -d["n_plotted"]):
+        if is_fscv and connect != "scatter":
+            continue
         start, stop = pd.get("fit_display_range", (-math.inf, math.inf))
         foreground = [p for p in pd["points"] if start <= p[0] <= stop]
         context = [p for p in pd["points"] if not start <= p[0] <= stop]
@@ -443,16 +499,23 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
 
     ax.set_xlim(lx0, lx1)
     ax.set_ylim(ly0, ly1)
-    x_ticks = np.arange(lx0, lx1 + lxi * 0.5, lxi)
-    y_ticks = np.arange(ly0, ly1 + lyi * 0.5, lyi)
-    ax.set_xticks(np.where(abs(x_ticks) < lxi * 1e-10, 0, x_ticks))
-    ax.set_yticks(np.where(abs(y_ticks) < lyi * 1e-10, 0, y_ticks))
+    if is_fscv:
+        # Anchor tick labels at zero independently of the padding around the data.
+        ax.xaxis.set_major_locator(MultipleLocator(lxi))
+        ax.yaxis.set_major_locator(MultipleLocator(lyi))
+        ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.tick_params(axis="x", which="minor", direction=st["tick_dir"], top=not open_axes, length=2)
+    else:
+        x_ticks = np.arange(lx0, lx1 + lxi * 0.5, lxi)
+        y_ticks = np.arange(ly0, ly1 + lyi * 0.5, lyi)
+        ax.set_xticks(np.where(abs(x_ticks) < lxi * 1e-10, 0, x_ticks))
+        ax.set_yticks(np.where(abs(y_ticks) < lyi * 1e-10, 0, y_ticks))
     ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%g"))
     if is_ms and axs.get("ms_y_exponent") == 10:
         ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:g}"))
     ax.tick_params(axis="both", which="major", direction=st["tick_dir"],
-                   top=True, right=True, length=3.0, width=0.6, pad=3)
+                   top=not open_axes, right=not open_axes, length=3.0, width=0.6, pad=3)
     for lbl in ax.get_xticklabels() + ax.get_yticklabels():
         lbl.set_fontfamily(fonts)
         lbl.set_fontsize(st["tick_pt"])
@@ -460,9 +523,11 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                             fontweight=st.get("axis_title_weight", "normal"), labelpad=2)
     ax.set_xlabel(axs["x_title"], **axis_title_style)
     ax.set_ylabel(axs["y_title"], **axis_title_style)
-    for sp in ax.spines.values():
-        sp.set_visible(True)
+    for side, sp in ax.spines.items():
+        sp.set_visible(not open_axes or side in ("left", "bottom"))
         sp.set_linewidth(st.get("frame_line_width_pt", 0.6))
+        if open_axes:
+            sp.set_color("#666666")
     ax.grid(st.get("grid", False))
     if st.get("equal_aspect"):
         ax.set_aspect("equal", adjustable="box")
@@ -485,7 +550,19 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
                         fontweight="bold" if focus_fit else "normal",
                         arrowprops={"arrowstyle": "-|>", "lw": 0.55, "color": "#303030"},
                         color="#222222", zorder=6)
-    annotations = ([] if frequency_key else
+    if is_fscv:
+        names = {series["curve"]: series.get("name") or series["curve"] for series in spec["series"]}
+        handles = [Line2D([], [], color=pd["color"], linewidth=st["line_width_pt"],
+                          linestyle="None" if connect == "scatter" else "-",
+                          marker=MARKER_MAP[pd["marker"]] if connect == "scatter" else None,
+                          label=names[pd["curve"]]) for pd in plotted]
+        ax.legend(handles=handles, loc=spec["legend"].get("loc", "upper right"), frameon=False,
+                  prop={"family": fonts, "size": st["tick_pt"]},
+                  handlelength=1.5, handletextpad=0.55, labelspacing=0.32)
+        table_curve = st.get("fscv_peak_table_curve")
+        if table_curve:
+            _draw_fscv_peak_table(ax, plotted, data["break_before_point"][0], table_curve, names, fonts)
+    annotations = ([] if frequency_key or is_fscv else
                    _place_annotations(ax, plotted, limits, st["tick_pt"], fonts, dpi,
                                       spec, {s["curve"]: s for s in spec["series"]}))
     texts = _draw_texts(fig, spec, fonts)
@@ -497,6 +574,9 @@ def prepare(spec: dict, target_ticks: int = 8, lock_axis: bool = False) -> dict:
     elif is_uvvis:
         for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
             point.update(wavelength_nm=float(row["wavelength_nm"]), absorbance=float(row["absorbance"]))
+    elif is_fscv:
+        for point, (_, _, row) in zip(points_norm, (pt for pd in plotted for pt in pd["points"])):
+            point.update(potential_V=float(row["potential_V"]), current_nA=float(row["current_nA"]))
 
     return {
         "fig": fig, "ax": ax, "spec": spec, "plotted": plotted,

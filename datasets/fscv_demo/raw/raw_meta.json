@@ -1,0 +1,46 @@
+{
+  "dataset": "fscv_demo",
+  "spectrum": "fscv",
+  "ingested_at": "2026-11-17T21:37:21",
+  "columns": [
+    "curve",
+    "point_index",
+    "potential_V",
+    "current_nA",
+    "include",
+    "note"
+  ],
+  "dedup_rule": "按文件名主干分组；组内文本导出优先，二进制记 skipped_duplicate；禁止用频率取整去重（浮点差 3.9e-04 量级）",
+  "source_of_sources": "https://zenodo.org/records/17154734",
+  "sources": [
+    {
+      "file": "FSCV_DA_concentration_series.csv",
+      "kind": "TEXT",
+      "sha256": "b4b6f82b9e07c58cd691012da4f30d70831967b2f34fa14a9937f5fab646f593",
+      "points": 12800,
+      "stamp": "",
+      "params": {
+        "column_header": [
+          "potential_V",
+          "DA_0.75uM_nA",
+          "DA_1.00uM_nA",
+          "DA_1.50uM_nA",
+          "DA_2.00uM_nA"
+        ]
+      },
+      "encoding": "utf-8-sig",
+      "status": "ingested",
+      "skipped_duplicate": "",
+      "first": null,
+      "last": null
+    }
+  ],
+  "totals": {
+    "source_files": 1,
+    "text_chosen": 1,
+    "skipped_duplicates": 0,
+    "bin_only_not_ingested": 0,
+    "curves": 4,
+    "points": 12800
+  }
+}

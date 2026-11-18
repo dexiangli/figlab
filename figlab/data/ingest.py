@@ -12,8 +12,10 @@
 """
 from __future__ import annotations
 
+import csv
 import hashlib
 import io
+import math
 import os
 import re
 import struct
@@ -48,7 +50,7 @@ def parse_malformed_time(s: str) -> float:
 
 
 def load_sources(src: str) -> list[tuple[str, bytes]]:
-    """源可以是一个目录，也可以是仪器导出的 zip 包。返回 (文件名, 字节)。"""
+    """Read a source directory, a ZIP archive, or a single text export."""
     out = []
     if os.path.isdir(src):
         for name in sorted(os.listdir(src)):
@@ -62,8 +64,11 @@ def load_sources(src: str) -> list[tuple[str, bytes]]:
                 if info.is_dir() or info.filename.startswith("__MACOSX"):
                     continue
                 out.append((os.path.basename(info.filename), zf.read(info)))
+    elif os.path.isfile(src) and os.path.splitext(src)[1].lower() in TEXT_EXT:
+        with open(src, "rb") as fh:
+            out.append((os.path.basename(src), fh.read()))
     else:
-        raise ValueError("源既不是目录也不是 zip：%s" % src)
+        raise ValueError("源须为目录、ZIP 或文本数据文件：%s" % src)
     return out
 
 
@@ -214,7 +219,34 @@ def parse_uvvis(blob: bytes):
     return dict(encoding=encoding, stamp="", params={"column_header": "nm,A"}, rows=rows)
 
 
+def parse_fscv(blob: bytes):
+    text, encoding = sniff_decode(blob)
+    reader = csv.reader(text.splitlines())
+    header = next(reader, [])
+    if len(header) < 2 or header[0] != "potential_V" or len(set(header)) != len(header):
+        raise ValueError("Expected potential_V and distinct FSCV current columns")
+    concentrations = [re.fullmatch(r"(.+)_([0-9]+(?:\.[0-9]+)?)uM_nA", name)
+                      for name in header[1:]]
+    if not all(concentrations):
+        raise ValueError("Expected FSCV current columns named <analyte>_<concentration>uM_nA")
+    labels = [f"{match[1]} {match[2]} μM" for match in concentrations]
+    rows = []
+    for index, values in enumerate(reader, start=1):
+        try:
+            finite = all(math.isfinite(float(value)) for value in values)
+        except ValueError:
+            finite = False
+        if len(values) != len(header) or not finite:
+            raise ValueError(f"Invalid FSCV data at CSV row {index + 1}")
+        rows.extend(dict(curve=label, point_index=index, potential_V=values[0], current_nA=current)
+                    for label, current in zip(labels, values[1:]))
+    if not rows:
+        raise ValueError("FSCV CSV contains no data")
+    return dict(encoding=encoding, stamp="", params={"column_header": header}, rows=rows)
+
+
 PARSERS = {"eis": parse_chi_text, "photothermal": parse_photothermal, "uvvis": parse_uvvis,
+           "fscv": parse_fscv,
            "mott_schottky": parse_mott_schottky}
 
 

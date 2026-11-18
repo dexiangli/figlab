@@ -27,20 +27,26 @@ def _match(patch: np.ndarray, target: np.ndarray, cos_thr: float = 0.96,
     return (cos > cos_thr) & (sat > sat_thr)
 
 
-def frame_from_png(path: str, page_cm: list[float]) -> dict:
-    """找四边框的长直线 → 反算图框像素位置与四边页边距（单位 cm）。"""
+def frame_from_png(path: str, page_cm: list[float], open_axes: bool = False) -> dict:
+    """Measure plot bounds from the long spine lines in the exported image."""
     im = np.array(Image.open(path).convert("RGB"))
     h, w = im.shape[:2]
     dpi_x = w / (page_cm[0] / 2.54)
     dpi_y = h / (page_cm[1] / 2.54)
     dpi = (dpi_x + dpi_y) / 2.0
-    dark = im.sum(2) < 200
+    dark = im.sum(2) < (365 if open_axes else 200)
     rows = np.where(dark.sum(1) > 0.5 * w)[0]
     cols = np.where(dark.sum(0) > 0.5 * h)[0]
-    if len(rows) < 2 or len(cols) < 2:
-        raise RuntimeError("位图中未检出四边框长直线，无法反算图框")
-    fx0, fx1 = int(cols.min()), int(cols.max())
-    fy0, fy1 = int(rows.min()), int(rows.max())
+    if open_axes and len(rows) and len(cols):
+        fx0 = int(cols[len(cols) // 2])
+        fy1 = int(rows[len(rows) // 2])
+        fx1 = int(np.flatnonzero(dark[fy1])[-1])
+        fy0 = int(np.flatnonzero(dark[:, fx0])[0])
+    elif len(rows) >= 2 and len(cols) >= 2:
+        fx0, fx1 = int(cols.min()), int(cols.max())
+        fy0, fy1 = int(rows.min()), int(rows.max())
+    else:
+        raise RuntimeError("位图中未检出坐标轴长直线，无法反算图框")
     return {
         "image_px": [w, h], "effective_dpi": round(dpi, 2),
         "frame_px": [fx0, fy0, fx1, fy1],

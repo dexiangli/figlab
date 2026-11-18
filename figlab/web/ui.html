@@ -304,6 +304,7 @@
   <button id="undoBtn" title="Ctrl+Z 撤销一步">↶ 撤销</button>
   <button id="redoBtn" title="Ctrl+Y 重做一步">↷ 重做</button>
   <button id="locationsBtn">文件位置</button>
+  <button id="drawingStyle" onclick="location.href='/style.html'">绘图风格</button>
   <button id="themeToggle">切换深色</button>
   <button id="helpBtn" title="操作说明与快捷键（? 键）">?</button>
   <span id="status">载入中…</span>
@@ -1157,6 +1158,8 @@ function showTip(e,p){
     : '';
   t.textContent = p.letter + '  ' + p.curve + '  #' + p.point_index + (p.wavelength_nm !== undefined
     ? '  λ=' + p.wavelength_nm.toFixed(1) + ' nm  A=' + p.absorbance.toFixed(4)
+    : p.current_nA !== undefined
+    ? '  E=' + p.potential_V.toFixed(3) + ' V  I=' + p.current_nA.toFixed(4) + ' nA'
     : p.potential_V !== undefined
     ? '  E=' + p.potential_V.toFixed(3) + ' V  Cₛ⁻²=' + p.inverse_Cs2.toPrecision(4) +
       ' × 10¹² F⁻²  相位 ' + p.phase_deg.toFixed(1) + '°'
@@ -1180,15 +1183,18 @@ function fillPoint(p){
     box.innerHTML = '<div class="kv"><b>提示</b><span>点击图上任意数据点</span></div>';
     form.style.display = 'none'; $('selBadge').textContent = '未选中'; return;
   }
-  const isMs = p.potential_V !== undefined;
+  const isFscv = p.current_nA !== undefined;
+  const isMs = p.potential_V !== undefined && !isFscv;
   const isUv = p.wavelength_nm !== undefined;
-  form.style.display = isMs || isUv ? 'none' : 'block';
+  form.style.display = isFscv || isMs || isUv ? 'none' : 'block';
   $('selBadge').textContent = p.letter + ' #' + p.point_index;
   box.innerHTML = '<div class="kv">' +
     '<b>曲线</b><span>' + esc(p.curve) + '</span>' +
     '<b>点序</b><span>' + esc(p.point_index) + '</span>' +
     (isUv ? '<b>波长 / nm</b><span>' + p.wavelength_nm.toFixed(1) + '</span>' +
       '<b>吸光度</b><span>' + p.absorbance.toFixed(4) + '</span>'
+    : isFscv ? '<b>电位 / V</b><span>' + p.potential_V.toFixed(3) + '</span>' +
+      '<b>电流 / nA</b><span>' + p.current_nA.toFixed(4) + '</span>'
     : '<b>频率</b><span>' + p.freq_Hz.toPrecision(6) + ' Hz</span>' +
     (isMs
     ? '<b>电位 / V</b><span>' + p.potential_V.toFixed(3) + '</span>' +
@@ -2910,6 +2916,8 @@ $('delTab').onclick = async ()=>{
 
 /* ====================== 启动 ====================== */
 (async ()=>{
+  const styleResponse = await get('/api/style-settings');
+  if(!styleResponse.configured && !styleResponse.error){ location.replace('/style.html'); return; }
   const r = parseFloat(localStorage.getItem('figlab.ratio'));
   setRatio(isNaN(r) ? 0.6 : r);
   setSide(localStorage.getItem('figlab.side') !== '0');

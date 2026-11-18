@@ -16,3 +16,4 @@ tmp_layer4_eis_main.json
 
 # 本机撤销历史（运行时数据，体积大且只对本机有意义）
 history/
+style_settings.json

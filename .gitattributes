@@ -8,3 +8,5 @@
 *.zip binary
 *.pdf binary
 *.pptx binary
+# Preserve the public FSCV source bytes and its recorded SHA-256 across platforms.
+datasets/fscv_demo/raw/sources/* -text whitespace=cr-at-eol

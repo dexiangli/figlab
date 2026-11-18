@@ -136,6 +136,7 @@ class Dataset:
                 "first": None, "last": None,
             })
 
+        n_curves = len({row["curve"] for row in rows})
         meta = {
             "dataset": self.name, "spectrum": self.spectrum,
             "ingested_at": now(), "columns": columns(self.spectrum),
@@ -148,7 +149,7 @@ class Dataset:
                 "text_chosen": len(chosen),
                 "skipped_duplicates": len(skipped),
                 "bin_only_not_ingested": len(bin_only),
-                "curves": len(chosen),
+                "curves": n_curves,
                 "points": len(rows),
             },
         }
@@ -160,7 +161,7 @@ class Dataset:
         if os.path.exists(lg):
             os.remove(lg)
         append_ledger(self.name, "ingest", reason or "首次摄取仪器导出文件",
-                      curves=len(chosen), points=len(rows),
+                      curves=n_curves, points=len(rows),
                       skipped_duplicates=[s["file"] for s in skipped],
                       bin_only_not_ingested=[b[1][0] for b in bin_only])
 

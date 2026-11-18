@@ -14,7 +14,7 @@ from .schema import PRESET_NAMES
 # 导出件命名：<数据日期><类别>作图，例如 20261107阻抗作图.pdf
 # 日期取数据自己带的（数据集名/原始文件），不是导出当天的——同一批数据隔几天
 # 再导，名字还是同一个，落在同一个文件夹里覆盖，不堆出「一天一份」。
-CATEGORY = {"eis": "阻抗", "photothermal": "光热", "mott_schottky": "Mott–Schottky"}
+CATEGORY = {"eis": "阻抗", "photothermal": "光热", "mott_schottky": "Mott–Schottky", "fscv": "FSCV"}
 
 
 def category_of(dataset: str, spectrum: str = "") -> str:
@@ -164,12 +164,14 @@ def series_for(curves: list[str], preset: dict) -> list[dict]:
 # 每种谱型默认拿哪两列画、轴标题写什么。阻抗以外的新谱型必须先在这里登记，
 # 否则会拿 Zp/Zpp 去画，图上出现一条不合逻辑的曲线。
 DATA_AXES = {
+    "fscv": ("potential_V", "current_nA"),
     "uvvis": ("wavelength_nm", "absorbance"),
     "eis": ("Zp_ohm", "Zpp_neg_ohm"),
     "photothermal": ("time_s", "temp_C"),
     "mott_schottky": ("potential_V", "inverse_Cs2"),
 }
 AXIS_TITLES = {
+    "fscv": ("Potential (V)", "Current (nA)"),
     "uvvis": ("Wavelength (nm)", "Absorbance (AU)"),
     "eis": ("Z' (Ω)", "-Z'' (Ω)"),
     "photothermal": ("Time (s)", "Temperature (°C)"),
@@ -182,6 +184,9 @@ def build_spec(fig_id: str, dataset: str, curves: list[str], preset: str = "inho
                tail_ohm: float = 60.0, fit_arc: bool = False,
                spectrum: str = "eis") -> dict:
     p = load_preset(preset)
+    if preset == "inhouse":
+        from .preferences import preferred_template
+        p = preferred_template() or p
     outdir = paths.out_dir(fig_id)
     suffix = next_suffix(dataset, spectrum)
     xcol, ycol = DATA_AXES.get(spectrum, DATA_AXES["eis"])

@@ -32,7 +32,8 @@ def verify(spec: dict) -> dict:
     visible_points = [p for p in points if left - 1e-6 <= p["nx"] <= right + 1e-6
                       and top - 1e-6 <= p["ny"] <= bottom + 1e-6]
 
-    frame = frame_from_png(png, [spec["page"]["w_cm"], spec["page"]["h_cm"]])
+    frame = frame_from_png(png, [spec["page"]["w_cm"], spec["page"]["h_cm"]],
+                           open_axes=spec["style"]["spines"] == "left_bottom")
     frame_cmp = compare_frame(frame, spec, tol_cm=0.05)
     hits = color_hit_rates(png, visible_points, radii=(4, 12))
     vec = vector_check(outdir, base, spec)
